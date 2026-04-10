@@ -83,17 +83,58 @@ Run at the start of each session to understand accumulated knowledge. This is th
 Set up the knowledge base structure. Adapts to what already exists.
 
 1. Detect source directory (see detection order above)
-2. If `graphify-out/graph.json` already exists, skip to orientation
+2. If `graphify-out/graph.json` already exists, skip graph build
 3. If sources exist but no graph, run `/graphify <source-dir>` to build initial graph
-4. Create `wiki/` structure only if user explicitly requests wiki mode:
-   - `wiki/index.md` — header template
-   - `wiki/log.md` — first entry
-   - `wiki/overview.md` — placeholder
+4. Create `wiki/` structure:
    - `wiki/entities/`, `wiki/concepts/`, `wiki/sources/`, `wiki/queries/`
+   - `wiki/index.md` — initial content:
+     ```markdown
+     ---
+     title: Knowledge Base Index
+     type: overview
+     date_modified: YYYY-MM-DD
+     ---
+     # Index
+
+     ## Entities
+     (none yet)
+
+     ## Concepts
+     (none yet)
+
+     ## Sources
+     (none yet)
+
+     ## Queries
+     (none yet)
+     ```
+   - `wiki/log.md` — first entry:
+     ```markdown
+     # Knowledge Base Log
+
+     ## [YYYY-MM-DD] init | Wiki initialized
+     - Created: index.md, log.md, overview.md
+     - Source directory: <detected-path>
+     - Graph: <N nodes, M edges> (or "not yet built")
+     ```
+   - `wiki/overview.md` — seed from GRAPH_REPORT.md if it exists:
+     ```markdown
+     ---
+     title: Overview
+     type: overview
+     date_modified: YYYY-MM-DD
+     ---
+     # Overview
+
+     [High-level synthesis of the knowledge base. Updated on each ingest.
+      If graph exists, seed with god nodes and community structure.]
+     ```
+   - `wiki/graph-report.md` — copy God Nodes + Communities + Surprising Connections from `GRAPH_REPORT.md`
 5. If `.obsidian/` exists nearby, configure for wikilinks:
    ```json
    {"alwaysUpdateLinks": true, "newLinkFormat": "shortest", "useMarkdownLinks": false}
    ```
+6. Run `/kg-orient` to present the initial state
 
 ### `/kg update` — Incremental Graph Rebuild
 
@@ -124,21 +165,55 @@ The core wiki-building operation. Requires wiki layer to be initialized.
    - Summary with key claims
    - `[[wikilinks]]` to entity/concept pages
 4. **Update entity pages** → `wiki/entities/<entity>.md`
-   - Create if new, append section if existing
-   - What it is, where it appears, how it connects
+   - **New entity**: create page with Key Facts + Connections sections
+   - **Existing entity**: add new facts under a `## From <source>` section. If new info contradicts existing claims, flag with `> [!warning] Tension: ...` and keep both versions
 5. **Update concept pages** → `wiki/concepts/<concept>.md`
-   - Include rationale — WHY decisions were made
-6. **Update** `wiki/overview.md`, `wiki/index.md`
-7. **Append to `wiki/log.md`**:
+   - **New concept**: create with Why This Matters + Current Status sections
+   - **Existing concept**: update Current Status, append to evidence. If the concept's framing has shifted, add `## Evolution` section tracking the change
+   - Include rationale — WHY decisions were made, trade-offs chosen
+6. **Update `wiki/index.md`** — add new pages under the correct category. Each entry: `- [[page-name]] — one-line summary`. Keep alphabetical within categories.
+7. **Update `wiki/overview.md`** — revise the high-level synthesis to incorporate new source. The overview should answer: "What is this knowledge base about, and what are the key themes?" Keep under 500 words. Don't just append — rewrite to integrate.
+8. **Append to `wiki/log.md`**:
    ```markdown
    ## [YYYY-MM-DD] ingest | Source Title
    - Added: sources/source-name.md
    - Updated: entities/module-x.md, concepts/openacc-porting.md
    - New pages: entities/new-entity.md
+   - Tensions found: [list any contradictions discovered, or "none"]
    ```
-8. **Rebuild graph** — run `/kg update` to refresh structural layer
+9. **Rebuild graph** — run `/kg update` to refresh structural layer
 
 **Batch ingest**: If many files, ask: "Process all at once or one by one?" Batch mode skips discussion, uses parallel subagents.
+
+### Wiki Maintenance Rules
+
+These rules govern how the wiki stays consistent as it grows.
+
+**When to create a new page vs update existing:**
+- An entity/concept mentioned 2+ times across different sources deserves its own page
+- A single mention can be a `[[wikilink]]` to a not-yet-created page (Obsidian shows these as unresolved — natural TODO list)
+- When creating, always add to `index.md` in the same operation
+
+**Handling contradictions:**
+- Never silently overwrite. When new source contradicts existing wiki content:
+  1. Add `> [!warning] Tension` callout on the affected page with both claims and sources
+  2. Log the tension in `wiki/log.md`
+  3. The next `/kg-reflect` will surface this for user resolution
+- The user decides which claim wins. Until then, both stay visible.
+
+**Handling deletions:**
+- If a source is removed from raw, its `wiki/sources/` page stays but gets `> [!note] Source removed from raw/` header
+- Entity/concept pages that referenced only that source get flagged in next `/kg-lint`
+- Never auto-delete wiki pages — always ask the user first
+
+**Keeping overview.md current:**
+- Rewrite (not append) on every ingest. It should read as a fresh synthesis, not a changelog.
+- Structure: 1 paragraph on scope, 1 paragraph per major theme, 1 paragraph on open questions.
+- Max 500 words. If it grows beyond this, split themes into their own concept pages and link.
+
+**graph-report.md sync:**
+- After every `/kg-update`, copy these sections from `GRAPH_REPORT.md` into `wiki/graph-report.md`: God Nodes (top 10), Communities (with labels), Surprising Connections, Hyperedges.
+- Don't copy the full report — just the sections useful for wiki navigation.
 
 ### `/kg query [question]` — Query Knowledge
 
