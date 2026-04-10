@@ -1,0 +1,35 @@
+{
+  "skill_name": "knowledge-graph",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm starting a new session on this project. What should I know about the existing knowledge base?",
+      "expected_output": "Detects graphify-out/ (graph-only mode), reads GRAPH_REPORT.md, presents orient summary: node/edge/community counts, top god nodes, wiki status ('not initialized'), freshness check. Does NOT require wiki/ to exist.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I just added 5 new decision documents to the vault. Update the knowledge graph to include them.",
+      "expected_output": "Detects source dir (gMeso/vault/), uses detect_incremental with manifest.json to find new files, delegates to graphify --update pipeline. Reports delta (new nodes/edges). If manifest missing, creates one first.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "How do the KDM6 phases relate to the RRTMG phases?",
+      "expected_output": "Graph-only query: reads GRAPH_REPORT.md for context, runs graph traversal (BFS) matching 'kdm6' and 'rrtmg' and 'phase' nodes. Uses node_link_graph(data, edges='links') to load graph.json. Synthesizes answer from graph structure.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Run a health check on the knowledge graph.",
+      "expected_output": "Graph-only lint: checks graph.json, GRAPH_REPORT.md, manifest.json, .graphify_python existence. Reports freshness. Notes wiki is not initialized. Does NOT fail or refuse to run without wiki.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Set up a wiki for this project's knowledge base.",
+      "expected_output": "Detects existing graph (skips rebuild). Creates wiki/ directory structure (index.md, log.md, overview.md, entities/, concepts/, sources/, queries/). Syncs GRAPH_REPORT.md sections into wiki/graph-report.md.",
+      "files": []
+    }
+  ]
+}
