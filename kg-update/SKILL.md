@@ -18,4 +18,6 @@ Rebuild the structural graph without re-ingesting into wiki. Delegates to Graphi
 
 **Technical:** Manifest at `graphify-out/manifest.json`. Graph at `graphify-out/graph.json` (NetworkX node_link_data format, `links` key not `edges`).
 
-For full reference, read `~/.claude/skills/kg/SKILL.md` section `/kg update`.
+**Phase Lock relation**: `kg-update` operates outside the schema Phase Lock (Draft→Approve→Apply→Migrate→Validate). It writes `graphify-out/*` and the **derived mirror** `wiki/graph-report.md` only — it does NOT modify `.schema/`, content wiki pages (`entities/`, `concepts/`, etc.), or proposals. `graph-report.md` is a derived artifact (sync from GRAPH_REPORT.md), not a content page; writing it is bookkeeping, not ontology mutation. Safe to run in any phase. No receipt implication.
+
+For full reference, read `~/.claude/skills/kg/SKILL.md` section `/kg-update`.

@@ -1,0 +1,21 @@
+schema_version: 1
+predicates:
+  structural:
+    - {name: contains,    domain: Artifact, range: Artifact}
+    - {name: calls,       domain: Artifact, range: Artifact}
+    - {name: imports,     domain: Artifact, range: Artifact}
+    - {name: depends_on,  domain: Artifact, range: Artifact}
+  semantic:
+    - {name: implements,  domain: Artifact,  range: Concept}
+    - {name: part_of,     domain: any,       range: any}
+    - {name: about,       domain: any,       range: Concept}
+  knowledge:
+    - {name: supported_by,    domain: any, range: Artifact}
+    - {name: contradicted_by, domain: any, range: any}
+    - {name: derived_from,    domain: any, range: any}
+    - {name: supersedes,      domain: any, range: any}
+  workflow:
+    - {name: applies_to,   domain: [Procedure, Heuristic], range: any}
+    - {name: prevents,     domain: Heuristic,              range: any}
+    - {name: learned_from, domain: Heuristic,              range: Experience}
+    - {name: decided_for,  domain: Decision,               range: any}

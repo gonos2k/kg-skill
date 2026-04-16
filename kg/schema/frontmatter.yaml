@@ -1,0 +1,36 @@
+schema_version: 1
+common_fields:
+  title:            {type: string, required: true}
+  instance_of:      {type: string, required: true, enum_from: core.yaml.classes}
+  page_kind:        {type: string, required: true}
+  epistemic_status: {type: string, enum_from: core.yaml.epistemic_states}
+  confidence:       {type: string, enum_from: core.yaml.confidence_levels}
+  date_created:     {type: date}
+  date_modified:    {type: date}
+  date:             {type: date}
+  distilled_from:   {type: "list[wikilink]"}
+  applies_when:     {type: string}
+  prevents:         {type: "list[wikilink]"}
+  provenance:
+    sources:        {type: "list[string]"}
+    code_refs:      {type: "list[string]"}
+  relations:
+    type: list
+    items:
+      predicate: {type: string, enum_from: relations.yaml.predicates}
+      target:    {type: wikilink}
+      rationale: {type: string}
+
+body_conventions:
+  claim_callout: |
+    > [!claim] <epistemic_status>
+    > <claim text>
+    > — supported_by: [[source-or-page]]
+  evidence_callout: |
+    > [!evidence]
+    > <verbatim quote or code span>
+    > — from: <file.F:123> or [[source-page]]
+  rationale: >
+    When kg v2 promotes Claim/Evidence to first-class nodes, a parser can walk
+    these callouts and materialize them. v1 authors who use the convention get
+    forward-compatibility if a parser is implemented. No parser is included in v1.

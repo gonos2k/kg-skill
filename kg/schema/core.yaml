@@ -1,0 +1,71 @@
+schema_version: 1
+classes:
+  Artifact:
+    description: Physical code, file, or data unit. Immutable reference.
+    page_kinds: [entity-page]
+    folder: entities
+    required_frontmatter: [title, instance_of, page_kind, epistemic_status]
+    required_body_sections: [Role, "Key Facts", Connections]
+    optional_frontmatter: [provenance, relations]
+  Concept:
+    description: Abstract idea, principle, or domain concept. No procedural content.
+    page_kinds: [concept-page]
+    folder: concepts
+    required_frontmatter: [title, instance_of, page_kind, epistemic_status]
+    required_body_sections: [Definition, "Why It Matters", "Current Understanding"]
+    optional_frontmatter: [provenance, relations]
+  Procedure:
+    description: How-to steps. Ordered, actionable, reproducible.
+    page_kinds: [procedure-page]
+    folder: procedures
+    required_frontmatter: [title, instance_of, page_kind, epistemic_status]
+    required_body_sections: [Purpose, Preconditions, Steps, "Postconditions / Verification"]
+    optional_frontmatter: [relations]
+  Experience:
+    description: Episodic case record. What was tried, what happened, what was learned.
+    page_kinds: [experience-page]
+    folder: experiences
+    required_frontmatter: [title, instance_of, page_kind, date]
+    required_body_sections: [Context, Attempted, Outcome, "Root Cause", Resolution, Lesson]
+    optional_frontmatter: [relations]
+  Heuristic:
+    description: Rule of thumb. Encodes tacit knowledge or hard-won shortcut.
+    page_kinds: [heuristic-page]
+    folder: heuristics
+    required_frontmatter: [title, instance_of, page_kind, epistemic_status, confidence]
+    required_body_sections: [Rule, Why, "Applies When", "Does Not Apply When", Evidence]
+    optional_frontmatter: [distilled_from, applies_when, prevents, relations]
+  Decision:
+    description: ADR-style judgment with rationale and alternatives.
+    page_kinds: [decision-page]
+    folder: decisions
+    required_frontmatter: [title, instance_of, page_kind, date]
+    required_body_sections: [Context, Decision, Rationale, "Alternatives Considered", Consequences]
+    optional_frontmatter: [relations]
+  Source:
+    description: Ingested source summary. One per raw source file. Immutable after creation.
+    page_kinds: [source-page]
+    folder: sources
+    required_frontmatter: [title, instance_of, page_kind]
+    required_body_sections: [Summary]
+    optional_frontmatter: [provenance, relations, date_ingested]
+epistemic_states:
+  - observed
+  - inferred
+  - hypothesis
+  - validated
+  - deprecated
+confidence_levels: [high, medium, low]
+legacy_mode:
+  entities:
+    implicit_instance_of: Artifact
+    implicit_page_kind: entity-page
+    schema_origin: legacy
+  concepts:
+    implicit_instance_of: Concept
+    implicit_page_kind: concept-page
+    schema_origin: legacy
+  sources:
+    implicit_instance_of: Source
+    implicit_page_kind: source-page
+    schema_origin: legacy

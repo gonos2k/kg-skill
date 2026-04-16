@@ -1,0 +1,13 @@
+version: 1
+date: 2026-04-11
+summary: Initial evolving mini-ontology schema.
+changes:
+  - introduced_classes: [Artifact, Concept, Procedure, Experience, Heuristic, Decision]
+  - introduced_epistemic_states: [observed, inferred, hypothesis, validated, deprecated]
+  - introduced_confidence_levels: [high, medium, low]
+  - introduced_predicate_groups: [structural, semantic, knowledge, workflow]
+  - legacy_folders_retained: [entities, concepts, sources, queries]
+  - new_folders: [procedures, experiences, heuristics, decisions]
+migration_from_legacy:
+  action: manual_opt_in
+  automatic_rewrites: []

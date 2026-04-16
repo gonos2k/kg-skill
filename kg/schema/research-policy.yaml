@@ -1,0 +1,10 @@
+max_rounds: 3
+max_sources_per_round: 5
+auto_ingest: false
+source_preferences:
+  prefer: [academic, official_docs, technical_blog]
+  avoid: [social_media, forums_without_code]
+confidence_floor: medium
+max_total_tokens: 30000
+cooldown_between_rounds: 0
+output_location: wiki/.research-queue/

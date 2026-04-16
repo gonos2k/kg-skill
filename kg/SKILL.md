@@ -21,14 +21,34 @@ project/
 │   └── (auto-detected: gMeso/vault/, raw/, docs/, or user-specified)
 │
 ├── wiki/                   # Layer 2: LLM-maintained wiki (optional)
+│   ├── .schema/            #   Per-wiki schema pin (copied from global on /kg init)
+│   │   ├── core.yaml       #     Class definitions
+│   │   ├── relations.yaml  #     Predicate vocabulary
+│   │   ├── frontmatter.yaml#     Field spec
+│   │   ├── pin.yaml        #     Version lock
+│   │   └── migrations/     #     Schema history
+│   ├── .schema-proposals/  #   Pending schema change proposals
 │   ├── index.md            #   Content catalog — every page listed
+│   ├── hot.md              #   Session context cache (~500 words)
 │   ├── log.md              #   Chronological record of operations
 │   ├── overview.md         #   High-level synthesis
 │   ├── graph-report.md     #   Synced from graphify-out/GRAPH_REPORT.md
-│   ├── entities/           #   Entity pages
-│   ├── concepts/           #   Concept pages
+│   ├── entities/           #   Artifact pages (code, files, data)
+│   │   └── _index.md       #     Folder-level index
+│   ├── concepts/           #   Concept pages (abstract ideas)
+│   │   └── _index.md
+│   ├── procedures/         #   Procedure pages (how-to steps)
+│   │   └── _index.md
+│   ├── experiences/        #   Experience pages (case records)
+│   │   └── _index.md
+│   ├── heuristics/         #   Heuristic pages (rules of thumb, 비법)
+│   │   └── _index.md
+│   ├── decisions/          #   Decision pages (ADR style)
+│   │   └── _index.md
 │   ├── sources/            #   Source summaries (one per ingested file)
+│   │   └── _index.md
 │   └── queries/            #   Filed query results worth keeping
+│       └── _index.md
 │
 ├── graphify-out/           # Structural graph layer
 │   ├── graph.json          #   Nodes, edges, communities
@@ -49,9 +69,77 @@ project/
 - **Graph-only** (default): Only `graphify-out/` exists. `/kg orient`, `/kg query`, `/kg update` all work against the graph alone.
 - **Graph + Wiki**: Both `graphify-out/` and `wiki/` exist. Wiki provides semantic depth on top of structural graph.
 
+## Evolving Mini-Ontology
+
+kg v2 separates **page_kind** (document format) from **instance_of** (ontology class). The schema is minimal by design and grows with use.
+
+### Core classes (7)
+- **Artifact** — physical code/file/data (`entities/`)
+- **Concept** — abstract idea (`concepts/`)
+- **Procedure** — how-to steps (`procedures/`)
+- **Experience** — episodic case (`experiences/`)
+- **Heuristic** — rule of thumb / 비법 (`heuristics/`)
+- **Decision** — judgment record (`decisions/`)
+- **Source** — ingested source summary (`sources/`)
+
+### Epistemic status
+Pages carry one of: `observed`, `inferred`, `hypothesis`, `validated`, `deprecated`.
+- Required on: Artifact, Concept, Procedure, Heuristic.
+- Optional on: Experience, Decision (these use `date` as primary metadata instead).
+- `hypothesis` is distinct from `inferred`: a working guess pending evidence vs. reasoned from existing sources.
+
+### Confidence levels (optional)
+Supplementary to epistemic status: `high`, `medium`, `low`. Required on Heuristic; optional elsewhere.
+
+### Frontmatter spec
+See `schema/frontmatter.yaml` for required/optional fields per page_kind. Minimum example:
+
+```yaml
+---
+title: Page Title
+instance_of: Artifact | Concept | Procedure | Experience | Heuristic | Decision
+page_kind: entity-page | concept-page | procedure-page | ...
+epistemic_status: observed | inferred | hypothesis | validated | deprecated
+confidence: high | medium | low
+date_created: YYYY-MM-DD
+date_modified: YYYY-MM-DD
+provenance:
+  sources: [source-file.pdf]
+  code_refs: ["file.F:123"]
+relations:
+  - {predicate: implements, target: "[[concept]]", rationale: ""}
+---
+```
+
+### Legacy page interpretation
+Existing `wiki/entities/*.md` and `wiki/concepts/*.md` pages without the new frontmatter fields are valid. The validator applies `legacy_mode` rules from `core.yaml`: implicit `instance_of`, `page_kind`, and `schema_origin: legacy`. No rewrites without explicit user approval.
+
+### Schema ownership (global default vs per-wiki pin)
+- **Global default** at `~/.claude/skills/kg/schema/` — shipped with the skill.
+- **Per-wiki pin** at `<project>/wiki/.schema/` — copied on `/kg init`. Records the exact schema version.
+- All `/kg-schema` operations target the per-wiki pin by default. `--global` flag for default.
+- Cross-project divergence is expected. `/kg-schema diff --global` shows drift.
+
+### Hot cache (`wiki/hot.md`) — session context persistence
+~500-word compressed context summary that survives between sessions.
+
+**Lifecycle:**
+- **Session start (`/kg-orient`)**: read `hot.md` FIRST, before `index.md`.
+- **After major write ops** (`/kg-ingest`, `/kg-elicit`, `/kg-postmortem`, `/kg-reflect`): overwrite with Current Focus, Recent Activity, Key Tensions.
+- **Context compaction**: re-read `hot.md` to recover session state.
+- The cache is a **view**, never a source of truth.
+
+### Folder-level indexes (`<folder>/_index.md`)
+Each content folder has a lightweight `_index.md` for query routing. Updated alongside the main index on ingest/elicit operations.
+
 ## Operations
 
-### `/kg orient` — Session Start Orientation
+### Naming convention
+- **`/kg-<verb>`** (hyphen) — independent slash commands invoking each sub-skill directly. These are the canonical user-facing commands (e.g., `/kg-orient`, `/kg-query`, `/kg-schema`).
+- **`/kg <verb>`** (space) — logical sub-command notation sometimes used in prose for readability. Section headers in this document use the canonical hyphenated form. Always use `/kg-<verb>` when invoking.
+- Sub-skill frontmatter `trigger:` field always uses the hyphenated form (ground truth).
+
+### `/kg-orient` — Session Start Orientation
 
 Run at the start of each session to understand accumulated knowledge. This is the most common entry point.
 
@@ -78,7 +166,7 @@ Run at the start of each session to understand accumulated knowledge. This is th
    Freshness: FRESH | STALE (N files changed since last build)
    ```
 
-### `/kg init [path]` — Initialize
+### `/kg-init [path]` — Initialize
 
 Set up the knowledge base structure. Adapts to what already exists.
 
@@ -136,7 +224,7 @@ Set up the knowledge base structure. Adapts to what already exists.
    ```
 6. Run `/kg-orient` to present the initial state
 
-### `/kg update` — Incremental Graph Rebuild
+### `/kg-update` — Incremental Graph Rebuild
 
 Rebuild the structural graph layer without re-ingesting into wiki. Delegates to Graphify.
 
@@ -152,7 +240,7 @@ Rebuild the structural graph layer without re-ingesting into wiki. Delegates to 
 
 To run manually: invoke `/graphify <source-dir> --update`
 
-### `/kg ingest [file-or-folder]` — Ingest into Wiki
+### `/kg-ingest [file-or-folder]` — Ingest into Wiki
 
 The core wiki-building operation. Requires wiki layer to be initialized.
 
@@ -215,7 +303,7 @@ These rules govern how the wiki stays consistent as it grows.
 - After every `/kg-update`, copy these sections from `GRAPH_REPORT.md` into `wiki/graph-report.md`: God Nodes (top 10), Communities (with labels), Surprising Connections, Hyperedges.
 - Don't copy the full report — just the sections useful for wiki navigation.
 
-### `/kg query [question]` — Query Knowledge
+### `/kg-query [question]` — Query Knowledge
 
 Answer questions against accumulated knowledge. Strategy depends on what layers exist.
 
@@ -234,7 +322,7 @@ Answer questions against accumulated knowledge. Strategy depends on what layers 
 
 **Verification chain**: Graph → Wiki → Raw Source. The graph finds direction, the wiki provides context, the raw source verifies claims. Never cite graph or wiki as primary evidence in decisions.
 
-### `/kg lint` — Health Check
+### `/kg-lint` — Health Check
 
 Audit knowledge base health. Adapts to available layers.
 
@@ -258,7 +346,7 @@ Report findings, offer to fix. If wiki exists, log the lint pass in `wiki/log.md
 
 Karpathy's pattern makes the LLM a diligent scribe. These operations make it a thinking partner — the LLM notices what the human might miss, challenges assumptions, and surfaces connections that cross the boundaries of what either could see alone.
 
-### `/kg reflect` — Proactive Insight
+### `/kg-reflect` — Proactive Insight
 
 After ingest or at session end, the LLM reviews recent activity and offers unprompted observations. Not a summary — a provocation.
 
@@ -272,7 +360,7 @@ The goal is to make the user think, not to inform. If reflect produces no genuin
 
 **When to trigger:** Automatically after every 3rd ingest, or when the user explicitly asks. Log reflections in `wiki/log.md` as `## [date] reflect | [one-line thesis]`.
 
-### `/kg challenge [claim]` — Devil's Advocate
+### `/kg-challenge [claim]` — Devil's Advocate
 
 The user states a belief or the LLM picks one from the wiki. The LLM then argues against it using only evidence from the knowledge base.
 
@@ -285,7 +373,7 @@ The user states a belief or the LLM picks one from the wiki. The LLM then argues
 
 This is not about being right. It's about stress-testing knowledge before it calcifies.
 
-### `/kg connect` — Cross-Community Bridge Discovery
+### `/kg-connect` — Cross-Community Bridge Discovery
 
 Graphify finds communities. This operation finds the *missing bridges* between them — connections that should exist based on semantic content but don't appear structurally.
 
@@ -297,21 +385,7 @@ Graphify finds communities. This operation finds the *missing bridges* between t
 
 This is where the graph and the human co-create knowledge that neither could produce alone.
 
-### `/kg evolve [concept]` — Understanding Timeline
-
-Track how the user's understanding of a concept has changed across sessions.
-
-**Steps:**
-1. Read `wiki/log.md` for all entries mentioning the concept
-2. Read the concept page's revision history (git log, or frontmatter date_modified)
-3. Read query results that touched this concept
-4. Present a timeline: "Here's how your understanding of [concept] evolved:"
-   - [date] First mention via [source] — initial framing was X
-   - [date] Challenged by [source] — shifted to Y
-   - [date] Your query revealed Z — current synthesis
-5. Ask: "Is this trajectory still the right direction, or has something shifted again?"
-
-### `/kg suggest` — Next Source Recommendation
+### `/kg-suggest` — Next Source Recommendation
 
 Based on current knowledge gaps, suggest what to read/ingest next.
 
@@ -339,13 +413,21 @@ These dialogue operations follow three principles:
 ```yaml
 ---
 title: Page Title
-type: entity | concept | source | query | overview
-tags: [relevant, tags]
+instance_of: Artifact | Concept | Procedure | Experience | Heuristic | Decision
+page_kind: entity-page | concept-page | procedure-page | experience-page | heuristic-page | decision-page
+epistemic_status: observed | inferred | hypothesis | validated | deprecated
+confidence: high | medium | low
 date_created: YYYY-MM-DD
 date_modified: YYYY-MM-DD
-sources: [source-file-1.pdf, source-file-2.md]
+provenance:
+  sources: [source-file-1.pdf]
+  code_refs: ["file.F:123"]
+relations:
+  - {predicate: implements, target: "[[concept]]", rationale: ""}
 ---
 ```
+
+Legacy pages (without `instance_of`) continue to work via `legacy_mode` in `core.yaml`.
 
 ### Wikilinks
 
@@ -353,15 +435,22 @@ Always use `[[wikilinks]]` for cross-references. This powers Obsidian's graph vi
 
 ### Page Templates
 
-**Entity** (`wiki/entities/module-mp-kdm6.md`):
+Templates live at `~/.claude/skills/kg/templates/`. Each class has a template matching `core.yaml` contract. Examples:
+
+**Artifact** (`wiki/entities/module-mp-kdm6.md`):
 ```markdown
 ---
 title: module_mp_kdm6
-type: entity
-tags: [fortran, microphysics, kdm6]
+instance_of: Artifact
+page_kind: entity-page
+epistemic_status: observed
+provenance:
+  code_refs: ["module_mp_kdm6.F"]
+relations: []
 ---
 # module_mp_kdm6
 
+## Role
 KDM6 microphysics module. Contains the main physics hotspot `kdm62D`.
 
 ## Key Facts
@@ -370,27 +459,60 @@ KDM6 microphysics module. Contains the main physics hotspot `kdm62D`.
 
 ## Connections
 - Called by: [[module-microphysics-driver]]
-- Concepts: [[openacc-porting]], [[register-pressure]]
+- Implements: [[register-pressure]]
 ```
 
-**Concept** (`wiki/concepts/register-pressure.md`):
+**Heuristic** (`wiki/heuristics/item-nogradguard.md`):
 ```markdown
 ---
-title: Register Pressure Risk (R1)
-type: concept
-tags: [gpu, risk, openacc]
+title: .item() 사용 시 반드시 NoGradGuard
+instance_of: Heuristic
+page_kind: heuristic-page
+epistemic_status: validated
+confidence: high
+distilled_from: []
+relations:
+  - {predicate: prevents, target: "[[autograd-graph-break]]"}
 ---
-# Register Pressure
+# .item() 사용 시 반드시 NoGradGuard
 
-Risk R1 in [[plan-kdm6-b200]]. kdm62D is ~2600 lines with hundreds
-of local variables — likely occupancy collapse on GPU.
+## Rule
+PyTorch 텐서에서 .item() 호출 시 반드시 torch.no_grad() 블록 안에서 수행.
 
-## Why This Matters
-[rationale — extracted from source decisions]
+## Why
+.item()은 연산그래프를 끊어 자동미분이 불가능해짐. 반복된 실수 발생.
 
-## Current Status
-Path C: monolithic refactor first, probe, split if spill > threshold.
+## Applies When
+PyTorch autograd 컨텍스트에서 스칼라 값을 추출할 때.
+
+## Does Not Apply When
+추론 전용 코드(이미 no_grad 블록 내부).
+
+## Evidence
+CLAUDE.md Command Memories에 3회 이상 반복 경고 기록.
 ```
+
+## Skill Routing Guide
+
+When the agent isn't sure which skill to invoke, use this map:
+
+| 사용자 의도 | 추천 스킬 | 참고 |
+|---|---|---|
+| 세션 시작 | `/kg-orient` | 항상 첫 번째 |
+| 질문/조회 | `/kg-query --depth` | quick/standard/deep |
+| 새 소스 투입 | `/kg-ingest` | → 자동으로 elicit/postmortem 권장 |
+| 암묵지/경험 기록 | `/kg-elicit` 또는 `/kg-postmortem` | elicit=일반, postmortem=최근 사건 |
+| 위키 건강 점검 | `/kg-lint` | orphan, dead links, stale claims |
+| 패턴/긴장 발견 | `/kg-reflect` | drift signal + novelty test |
+| 다음에 뭘 읽을지 | `/kg-suggest` | knowledge gap 기반 추천 |
+| 커뮤니티 간 연결 | `/kg-connect` | cross-community bridge |
+| 주장 반박 테스트 | `/kg-challenge` | devil's advocate |
+| 스키마 변경 | `/kg-schema` | propose → approve → migrate |
+| 판단 대체 기록 | 수동 `supersedes` relation + `/kg-reflect` 후보 감지 | Decision/Heuristic 대상 |
+| 웹 조사 | `/kg-autoresearch` | source queue + user approval |
+| 시각화 | `/kg-canvas` | .canvas JSON export |
+| 그래프 재빌드 | `/kg-update` | graphify incremental |
+| wiki 초기화 | `/kg-init` | 최초 1회 또는 재부트 |
 
 ## Usage Rules
 
@@ -403,6 +525,273 @@ Path C: monolithic refactor first, probe, split if spill > threshold.
 4. **Keep the wiki growing** — Every ingested source, answered query, lint fix makes it richer. Human curates sources and asks questions. LLM does the bookkeeping.
 
 5. **Co-evolve the schema** — CLAUDE.md documents how the wiki is structured, what conventions apply, what workflows to follow. As you learn what works for your domain, update CLAUDE.md together with the LLM. The schema is what makes the LLM a disciplined wiki maintainer rather than a generic chatbot.
+
+## Operation Authority Matrix
+
+Who decides: **Human** (explicit approval required) vs **LLM** (autonomous, report only).
+
+| Operation | Authority | Rationale |
+|---|---|---|
+| Schema change (propose/approve) | **Human** | Ontology is the contract — no auto-mutation |
+| Page reclassification/move | **Human** | Folder change = identity change |
+| Page deletion | **Human** | Irreversible |
+| Source approve (autoresearch) | **Human** | Provenance integrity |
+| Heuristic promotion from Experience | **Human** | Generalization = judgment call |
+| Research angle lock | **Human** | Scope control |
+| hot.md overwrite | **LLM** (report at session end) | Bookkeeping view, not truth |
+| log.md append | **LLM** | Append-only audit trail |
+| _index.md sync | **LLM** | Derived from actual files |
+| Query filing to wiki/queries/ | **LLM** (if 3+ pages cross-referenced OR user says "save") | Low-stakes, reversible |
+| pull-global compatible changes | **LLM** (dry-run first, show diff) | Always preview before apply |
+
+**Principle:** "Schema/research처럼 비싼 변화는 사용자 승인. hot/log/index 같은 일상 bookkeeping은 LLM 재량."
+
+## LLM Interaction Guidelines
+
+### hot.md Compression Priority
+When updating hot.md (~500 words max), prioritize in this order:
+1. **Current Focus** (1-2 sentences: what the user is actively working on)
+2. **Key Tensions / Open Questions** (top 3, most recent first)
+3. **Recent Activity** (last 5 operations, most recent first)
+
+If space is tight, drop old activity entries first.
+
+### /kg-reflect Novelty Test
+Before surfacing an insight, it must pass at least one:
+- **Cross-reference test**: cites 2+ wiki pages that contradict or tension each other
+- **Anomaly test**: graph structure (community isolation, missing bridge) + wiki content mismatch
+- **Temporal test**: early sources assumed X, recent sources assume not-X
+- **Blind spot test**: a concept is referenced 3+ times but has no page
+
+If none pass, say "no novel insights this cycle" — don't fabricate.
+
+### /kg-ingest Elicitation — Soft Transition
+When keyword sweep detects trigger words (실패/주의/반복/명심/비법), don't jump into interrogation mode. Instead:
+1. "이 문서에 [keyword] 관련 경험이 보입니다. 기록해둘까요?" (propose)
+2. Wait for user response
+3. Only then invoke `/kg-elicit` flow
+
+### Document Authority
+- **Sub-skills are the authoritative source** for each operation's detailed flow
+- **This main SKILL.md is the hub**: architecture overview, ontology spec, authority matrix, interaction guidelines
+- When sub-skill text diverges from this hub, the sub-skill wins for execution details; this hub wins for ontology/authority rules
+
+## Migration Policy
+
+**Legacy pages (68 files, `type:` only, no `instance_of`):**
+- Officially supported long-term. Validator treats them as warnings, not errors.
+- Upgrade is opt-in: when a page is actively edited, add `instance_of` and `page_kind`. No batch rewrite.
+
+**Transitional pages (18 files, `instance_of` set, body sections not restructured):**
+- Body restructuring happens when the page is next meaningfully updated.
+- Validator tracks body drift as stderr warnings. `/kg-reflect` surfaces these as schema drift signals.
+- Target: within 3 months, most frequently-edited pages should be full v1.
+
+**New pages (created after bootstrap):**
+- Must be full v1 from creation. Validator enforces strictly. Templates ensure compliance.
+
+## Context Compression
+
+As the wiki grows, reading cost must stay sub-linear. The compression hierarchy:
+
+```
+hot.md (250-400 tok) → overview.md (400-600) → _index.md (150-300) → individual page
+```
+
+### Reading Priority (all skills)
+0. **BM25 lookup** (0 tokens) — `build_search_index.py` generates `wiki/.search_index.json`. Query returns top-k pages ranked by relevance. Run before any page reads.
+1. `hot.md` — always first. If fresh (<24h), may skip further reads for quick tasks
+2. `overview.md` — stable global synthesis. Second read for cross-folder context
+3. `<folder>/_index.md` — folder-level routing with cluster map and anchor pages
+4. `index.md` — **last resort** canonical catalog. Not a default read past 200 pages
+
+### BM25 Search Index
+- Builder: `~/.claude/skills/kg/schema/tools/build_search_index.py wiki`
+- Output: `wiki/.search_index.json` (89 docs, 8670 terms, Korean+English CJK tokenizer)
+- Section-level indexing: each `## Heading` is a separate posting
+- Rebuild: after ingest, after reclassify, or manually
+- Token cost: **0** (local keyword lookup, no LLM call)
+
+### Adaptive Scaling
+- **<120 pages (current)**: hot + overview + _index is sufficient for most operations
+- **200+ pages**: add `.meta/communities/*.md` (topic cluster digest, ~200 tok each)
+- **500+ pages**: split hot into global (300 tok) + per-cluster (120 tok each); demote index.md to registry-only
+
+### Archive Policy
+Pages are never deleted. Archive = frontmatter flag, not folder move.
+- Add `archived: true`, `date_archived`, `archive_reason` to frontmatter
+- **Candidate criteria**: 120+ days unmodified, not in recent 20 log entries, not in active frontier, inbound non-archived links <= 1
+- **Excluded from archive**: Source and Decision pages (evidence/judgment records have higher preservation value)
+- Archived pages are skipped by `/kg-query` and `/kg-reflect` by default; `--include-archived` to override
+- Restore = remove flag + log entry. Human authority required.
+
+## Schema as Core Product
+
+The schema (`core.yaml` + `relations.yaml` + `frontmatter.yaml`) is not just infrastructure — it IS the domain model. Treat it as a first-class product.
+
+### Signal-to-Proposal Contract
+When `/kg-reflect` emits a drift signal (SIG-*), it must follow this lifecycle:
+
+```
+SIG detected → surfaced in reflect report → user decides:
+  → `/kg-schema propose` (formalize as proposal) → approve/reject
+  → explicit reject (signal marked "rejected, rationale: ...")
+  → defer (signal stays, age increments)
+  → 3 cycles without action → STALE escalation
+```
+
+No signal should remain unaddressed indefinitely. Reflect tracks signal age; lint flags STALE signals.
+
+### Proposal Minimum Fields
+```yaml
+proposal_id: YYYY-MM-DD-<slug>
+date: YYYY-MM-DD
+type: add_class | add_relation | deprecate_class | rename | add_epistemic_state
+description: ""
+rationale: ""
+evidence: []        # wikilinks to pages that motivated this
+originating_signal: SIG-NNN  # link back to reflect signal
+status: pending | approved | rejected
+rejection_reason: ""  # if rejected, why
+```
+
+### Receipt-Based Evidence (Deep Suite pattern)
+
+Every schema approve collects a structured receipt before proceeding. The receipt is the gate — no approve without evidence.
+
+**Receipt collection**: `validate.py --receipt` runs all sensors and outputs JSON:
+```bash
+python3 ~/.claude/skills/kg/schema/tools/validate.py \
+  --receipt --schema-dir wiki/.schema \
+  --wiki-root wiki/ --proposal wiki/.schema-proposals/<id>.yaml \
+  wiki/**/*.md
+```
+
+**Receipt checks** (6 sensors):
+| Check | Tier | Auto-fixable | What it validates |
+|-------|------|:---:|---|
+| `schema_diff` | Required | ❌ | target_version = current + 1 |
+| `template_contract` | Required | ✅ | templates match core.yaml class definitions |
+| `frontmatter_valid` | Required | ✅ | all pages pass frontmatter validation |
+| `legacy_compat` | Required | ❌ | legacy/transitional pages unaffected |
+| `evidence_pages` | Required | ❌ | cited evidence pages exist |
+| `predicate_utilization` | Advisory | ❌ | % of predicates in active use |
+
+**Gate rule**: All Required checks must be PASS or SKIP. Advisory is reported but doesn't block. Missing data = SKIP, not FAIL.
+
+**Sensor loop**: auto-fixable failures (template, frontmatter) trigger fix → re-run, max 3 rounds. Non-fixable failures → human escalation.
+
+**Receipt file**: written to `.schema-proposals/<id>-receipt.yaml` alongside the proposal.
+
+### Schema Health Indicators (tracked in hot.md Maintenance Debt)
+- `proposal_debt`: pending proposals not acted on for 2+ cycles
+- `signal_staleness`: SIG-* surfaced 3+ times without propose/reject
+- `predicate_utilization`: % of defined predicates used at least once in wiki
+- `receipt_coverage`: % of approved proposals with receipt (target: 100%)
+
+## Supersession (판단 대체 기록)
+
+When a new Decision replaces an old one, use the `supersedes` predicate to preserve judgment history.
+
+### Scope
+- **Decision**: primary target. When a new design choice replaces a previous one.
+- **Heuristic**: optional. When a rule is refined or overridden by a better rule.
+- **Experience**: excluded. Episodes are not "replaced" — they are evidence.
+
+### Workflow (manual + semi-auto)
+1. **Author creates** new Decision with `relations: [{predicate: supersedes, target: "[[old-decision]]"}]`
+2. **Old page** gets `epistemic_status: deprecated` + `> [!superseded] Replaced by [[new-decision]]` callout at top
+3. **If author forgets**: `/kg-reflect` detects "same `decided_for` target, newer page exists" → emits `POSSIBLE_SUPERSESSION` signal with prefilled command
+4. `/kg-lint` flags deprecated pages that lack a `superseded by` callout
+
+### Authority
+Supersession = page identity change → **Human approval required** (per Authority Matrix).
+
+## Convergence Tracking
+
+### Active Frontier
+Not all pages need to be full v1. Convergence targets the **active frontier**: pages modified in last 30 days, pages referenced in hot.md Current Focus, pages cited in recent reflect signals.
+
+### Metrics (computed by `validate.py --summary`)
+- `convergence_ratio` = full_v1 / total_pages (target: frontier >= 0.8)
+- `reflect_debt` = ingests since last reflect (warn >= 3)
+- `transitional_age` = days since reclassification without body restructure
+
+### Attractor Test (4 conditions = "converging")
+1. Recent 5 maintenance cycles: reflect_debt <= 2 in 4+ cycles
+2. Active frontier full_v1_ratio >= 0.8, no 2-week regression
+3. Threshold drift signals closed by propose or explicit reject within 2 cycles
+4. No transitional page in hot set older than 21 days
+
+### Fixpoint (operational definition)
+Last 3 `/kg-reflect` runs produce no new drift signals above threshold, pending proposals = 0, active frontier new pages = 100% template-compliant. Cold legacy excluded from this judgment.
+
+## How the Ontology Grows (Meta-Process)
+
+The schema is a living artifact. Growth follows a bounded loop:
+
+1. **Observe** — `/kg-reflect` continuously watches for pattern drift.
+2. **Propose** — drift becomes a `/kg-schema propose` entry, never an auto-change.
+3. **Deliberate** — user reviews proposal. Rejection is valid and expected.
+4. **Apply** — approved proposal bumps `schema_version`, writes a migration file.
+5. **Migrate** — `/kg-schema migrate` walks affected pages, proposing fixes one-by-one.
+6. **Record** — every change is logged with rationale, so the schema history itself becomes a knowledge artifact about how our understanding evolved.
+
+**What we are not doing:**
+- No formal reasoner. This is a mini-ontology — a typed vocabulary, not OWL.
+- No auto-classification. Humans judge class membership.
+- No schema rollback. We only move forward via `deprecate`.
+
+**Why this shape:** fixed ontologies calcify; free-form wikis lose structure. The proposal loop is the narrow seam where structure and evolution meet without fighting.
+
+## Codex Integration (양방향 파이프라인)
+
+### Codex → kg: Review Result Structuring
+
+When Codex performs code reviews (`/codex:review`, `/codex:rescue`), the findings can be filed into the wiki as structured knowledge.
+
+**Workflow** (manual trigger, not automatic):
+1. After Codex review completes, user says "kg에 기록" or LLM suggests filing
+2. Parse Codex output: findings array with severity, description, location
+3. Create `wiki/experiences/codex-review-<date>-<slug>.md` with Experience template:
+   - Context: what was reviewed and why
+   - Attempted: what the code tried to do
+   - Outcome: Codex findings (severity-ordered)
+   - Lesson: actionable takeaway
+4. If the same pattern appears in 3+ Codex reviews → suggest Heuristic promotion via `/kg-elicit`
+5. Update `wiki/log.md` and `wiki/hot.md`
+
+**Pattern detection**: When filing a Codex review, check existing experiences for recurring themes:
+- Same file/module flagged repeatedly → architectural issue
+- Same error pattern across reviews → candidate Heuristic
+- Contradicts an existing Heuristic → tension, surface in next reflect
+
+### kg → Codex: Domain Context Injection
+
+When invoking Codex for reviews or tasks, the LLM can enrich the prompt with kg context.
+
+**`<domain_context>` block** (added to Codex prompts when relevant):
+```xml
+<domain_context>
+Project heuristics (from wiki/heuristics/):
+{relevant_heuristics — max 5, selected by topic match}
+
+Active decisions (from wiki/decisions/):
+{relevant_decisions — max 3, most recent first}
+
+Known tensions (from wiki/hot.md):
+{current_tensions — max 3}
+</domain_context>
+```
+
+**Selection logic**:
+1. Read `wiki/hot.md` for current focus
+2. Match Codex task topic against heuristic `applies_when` fields
+3. Match against decision `decided_for` targets
+4. Include only items with `confidence: high` or `epistemic_status: validated`
+5. Cap at ~500 tokens to keep Codex prompt lean
+
+**When to inject**: automatically when `/codex:rescue` or `/codex:review` is invoked and `wiki/heuristics/` has content. Skip if `--no-kg-context` flag is set.
 
 ## Technical Notes
 
