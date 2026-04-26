@@ -1,12 +1,25 @@
 ---
 name: kg-init
-description: Bootstrap or upgrade a wiki directory to the evolving mini-ontology. Copies the global schema into <project>/wiki/.schema/, creates per-wiki pin.yaml, and ensures all folders required by v1 classes exist. Idempotent — safe to re-run. Invoke as /kg init [project-path] or let /kg init auto-detect cwd.
+description: "This skill should be used when the user asks to initialize, bootstrap, reset, or prepare a kg-skill wiki, says 'kg-skill 처음 설정', 'wiki 초기화', '스키마 pin 만들기', or invokes /kg-init. Creates wiki/, copies schema, seeds index/log/hot, validates setup. Idempotent — never overwrites existing wiki content."
 trigger: /kg-init
 ---
 
 # /kg-init — Bootstrap a Wiki for the Evolving Mini-Ontology
 
 This is the single source of "wiki is ready to use v1". Every other kg skill that writes to the wiki assumes this has run.
+
+## Activate When
+
+- User invokes `/kg-init` (with or without project path)
+- User asks "kg-skill 처음 설정", "wiki 초기화", "스키마 pin 만들기"
+- A new project needs the kg wiki layer
+- Pin file is missing or schema upgrade requested
+
+## Do Not Activate When
+
+- Wiki already exists and contains content → use `/kg-orient` for status, `/kg-schema pull-global` for schema upgrade
+- User wants to ingest content → `/kg-ingest`
+- User wants to query → `/kg-query`
 
 ## Preconditions
 - Global schema exists at `~/.claude/skills/kg/schema/`
@@ -103,18 +116,54 @@ This is the single source of "wiki is ready to use v1". Every other kg skill tha
    ```
    Expected: exit 0 (contract check runs against templates, no page errors).
 
-7. **Report**
+7. **Optional: install `/graphify` companion skill** (only on first-time setup, ask before running)
+   ```bash
+   graphify install --platform claude
    ```
-   Initialized wiki at <path>
-   Pin: v1 (copied from global)
-   Folders: 10 created/verified
-   Validator: OK
-   Ready for /kg-ingest, /kg-elicit, /kg-postmortem, /kg-schema.
-   ```
+   This adds `~/.claude/skills/graphify/SKILL.md` so `/kg-update` and other skills can soft-depend on graphify v0.5.0+ tools.
 
 ## Idempotency contract
-- Running `/kg init` twice MUST NOT:
+- Running `/kg-init` twice MUST NOT:
   - Overwrite an existing `pin.yaml`
   - Clobber `index.md`, `log.md`, `hot.md`, or any content page
   - Change migration files
 - Running on a wiki whose pin is older than global prints a notice suggesting `/kg-schema pull-global` but does NOT pull automatically.
+
+## Output Contract
+
+```text
+Init result: PASS | PARTIAL | FAIL
+Wiki root: <path>
+Pin: v<N> (created | existing | missing-global)
+Folders created: <N>
+Folders verified existing: <N>
+Schema files copied: <list | skipped (existing)>
+Research policy: copied | skipped | missing-global
+Seed files: index.md=<created|kept>, log.md=<created|kept>, hot.md=<created|kept>
+Folder _index.md stubs: <N created, M kept>
+Validator: PASS | FAIL (<details if fail>)
+graphify companion: installed | skipped | not-asked
+
+Caveats:
+- <existing wiki preserved | global schema missing | none>
+
+Next command:
+- /kg-orient | /kg-ingest <file> | /kg-schema list
+```
+
+## Exceptions and Escalation
+
+- **Global schema directory missing** (`~/.claude/skills/kg/schema/` absent) → stop and report exact missing path. Do not proceed.
+- **`wiki/.schema/pin.yaml` already exists** → skip write (do not overwrite). Note in output as "Pin: existing".
+- **`wiki/index.md`, `wiki/log.md`, or `wiki/hot.md` exists** → preserve. Note in output as "kept".
+- **Validator fails** → report exact failing file path. Do not suggest `/kg-ingest` until fixed.
+- **Migration files exist** → never modify. They are append-only history.
+
+## Quality Gates
+
+Before final answer:
+- [ ] No existing wiki content was overwritten (idempotency)
+- [ ] Pin records source version
+- [ ] All 10 folders exist (create or verify)
+- [ ] Validator passed against per-wiki pin
+- [ ] log.md contains init entry with date

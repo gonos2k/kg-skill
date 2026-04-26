@@ -1,12 +1,26 @@
 ---
 name: kg-query
-description: Query accumulated knowledge — BFS/DFS graph traversal + wiki lookup. Supports --depth quick|standard|deep for token-efficient queries. Use when asking questions about the knowledge base, codebase relationships, or concept connections.
+description: "Query accumulated knowledge — BFS/DFS graph traversal + wiki lookup. Supports --depth quick|standard|deep for token-efficient queries. Use when asking questions ABOUT existing knowledge (relationships, evidence, decisions). For PROPOSING new connections between communities, use /kg-connect instead."
 trigger: /kg-query
 ---
 
 # /kg-query — Query Knowledge
 
 Answer questions against accumulated knowledge. Strategy depends on available layers and requested depth.
+
+## Activate When
+
+- User asks a question about the kg wiki, codebase relationships, or concept connections
+- User invokes `/kg-query <question> [--depth quick|standard|deep]`
+- After `/kg-orient`, when user wants to dive into a specific topic
+- Before deciding what to ingest next (deep mode = "do we have this already?")
+
+## Do Not Activate When
+
+- Question is about external (web) information not in wiki → `/kg-autoresearch`
+- User wants pattern/tension surfacing → `/kg-reflect`
+- User wants to test a single claim → `/kg-challenge`
+- User wants suggestions for what to ingest → `/kg-suggest`
 
 ## Query Depth Modes
 
@@ -38,7 +52,8 @@ Best for: factual questions, concept lookups, relationship queries.
 3. Read raw source files cited in provenance fields
 4. If graph layer exists, run BFS traversal from relevant nodes
 5. Cross-reference claims across sources; flag contradictions
-6. If wiki is insufficient and topic is external: suggest `/kg-autoresearch`
+6. **Deterministic claim/evidence harvest**: run `python3 ~/.claude/skills/kg/schema/tools/extract_claims.py wiki/ --types=claim,evidence` to get a JSON list of all `> [!claim]` and `> [!evidence]` callouts before synthesizing the answer. Cite by `page:line`.
+7. If wiki is insufficient and topic is external: suggest `/kg-autoresearch`
 
 Best for: "Why did we choose X over Y?", cross-cutting analysis, preparing for decisions.
 
@@ -63,6 +78,76 @@ Each mode has a soft budget. If exceeded before synthesis:
 
 **Verification chain:** Graph -> Wiki -> Raw Source. Never cite graph/wiki as primary evidence.
 
-**Codex handoff**: Query results can be injected into Codex prompts as `<domain_context>` when the follow-up is a Codex review/rescue task. Selection: matched heuristics (`confidence: high`), related decisions (`decided_for`), hot.md tensions. Cap ~500 tokens. See SKILL.md § Codex Integration.
+**Codex handoff**: Query results can be injected into Codex prompts as `<domain_context>` when the follow-up is a Codex review/rescue task. Selection: matched heuristics (`confidence: high`), related decisions (`decided_for`), hot.md tensions. Cap ~500 tokens. See `~/.claude/skills/kg/references/codex-integration.md`.
 
-For full reference, read `~/.claude/skills/kg/SKILL.md` section `/kg-query`.
+## Output Contract
+
+Always return:
+
+```text
+Answer:
+<direct answer to the question>
+
+Evidence read:
+- hot.md: yes | no
+- overview.md: yes | no
+- wiki pages: [[a]], [[b]], ...
+- raw sources: <none | list>
+- graph traversal: <none | depth-N from [[anchor]]>
+
+Confidence:
+high | medium | low
+
+Caveats:
+- <missing evidence | stale pages | contradictions | none>
+
+Next command:
+- <none | /kg-query --depth deep | /kg-autoresearch "<topic>" | read [[page]]>
+```
+
+## Examples
+
+### Example 1 — quick status
+
+User:
+```text
+/kg-query "최근에 내가 뭘 보고 있었지?" --depth quick
+```
+
+Expected behavior:
+- Read `wiki/hot.md` only.
+- Skip BM25 if hot.md fresh (<24h).
+- Return compact answer + confidence + suggested next step.
+- Do not scan raw sources.
+
+### Example 2 — decision question, deep mode
+
+User:
+```text
+/kg-query "왜 OntoGPT를 PoC 1순위로 봤지?" --depth deep
+```
+
+Expected behavior:
+- BM25 for "OntoGPT" + "PoC" → top-10 pages.
+- Read relevant Decision/Concept/Source pages.
+- Follow wikilinks to depth 2.
+- Read raw sources cited in Decision page provenance.
+- Distinguish wiki summary from primary evidence.
+- Return Answer with explicit "Evidence read" listing both wiki pages and raw sources.
+
+## Exceptions and Escalation
+
+- **BM25 index stale or missing** → rebuild via `python3 ~/.claude/skills/kg/schema/tools/build_search_index.py wiki` before reading multiple pages.
+- **No relevant page found in standard mode** → do not hallucinate. Say so and suggest `--depth deep`.
+- **Deep mode still insufficient** → suggest `/kg-autoresearch "<topic>"`.
+- **For decisions** → never cite graph/wiki as primary evidence. Always trace to raw sources via provenance.
+- **Token budget exceeded** → apply per-mode truncation (see § Token Budget Enforcement) and note the truncation in Caveats.
+- **Wiki absent** → fall back to graph-only mode if `graphify-out/` exists. If neither, suggest `/kg-init` + ingest.
+
+## Quality Gates
+
+Before final answer:
+- [ ] Every claim is cited with `[[wikilink]]` or raw source path
+- [ ] Confidence label honestly reflects evidence quality
+- [ ] Caveats list any missing evidence, not just success
+- [ ] If filed to `wiki/queries/`, log entry added
