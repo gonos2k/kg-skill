@@ -63,14 +63,26 @@ def collect_pages(wiki_root: Path) -> dict[str, tuple[Path, dict, str]]:
 
 
 def find_wikilinks(body: str) -> list[str]:
+    """Raw wikilink targets, possibly with folder/ prefix."""
     return [m.group(1).strip() for m in WIKILINK_RE.finditer(body)]
+
+
+def normalize_target(target: str) -> str:
+    """Canonical slug form: strip folder prefix.
+
+    Wikilinks may use either `[[concept-x]]` (slug only) or
+    `[[concepts/concept-x]]` (path form). Both should resolve to the same
+    page. We canonicalize to the basename so the orphan/missing checks
+    don't false-positive on path-form links.
+    """
+    return target.rstrip("/").split("/")[-1]
 
 
 def detect_orphans(pages) -> list[str]:
     inbound: dict[str, int] = defaultdict(int)
     for _slug, (_path, _fm, body) in pages.items():
         for target in find_wikilinks(body):
-            inbound[target] += 1
+            inbound[normalize_target(target)] += 1
     return sorted(slug for slug in pages if inbound.get(slug, 0) == 0)
 
 
@@ -78,8 +90,8 @@ def detect_missing(pages) -> dict[str, list[str]]:
     missing: dict[str, list[str]] = defaultdict(list)
     for slug, (_path, _fm, body) in pages.items():
         for target in find_wikilinks(body):
-            if target not in pages:
-                missing[target].append(slug)
+            if normalize_target(target) not in pages:
+                missing[target].append(slug)  # keep original form for the report
     return dict(missing)
 
 
@@ -100,7 +112,7 @@ def detect_supersession_orphans(pages) -> list[tuple[str, str]]:
         for rel in relations:
             if not isinstance(rel, dict) or rel.get("predicate") != "supersedes":
                 continue
-            target = (rel.get("target") or "").strip("[]").strip()
+            target = normalize_target((rel.get("target") or "").strip("[]").strip())
             if target in pages:
                 target_fm = pages[target][1]
                 if target_fm.get("epistemic_status") != "deprecated":
