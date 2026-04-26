@@ -44,6 +44,13 @@ Per graphify v0.5.0 `serve.py`. The MCP server is launched by the **graphify sla
 
 ## Subcommands
 
+### `/kg-mcp` (no subcommand) — defaults to `status`
+
+Bare invocation `/kg-mcp` (without `register|status|unregister`) is treated as `/kg-mcp status` (read-only inspection). Rationale: status is the only read-only subcommand; defaulting to it lets users inspect current registration with minimal typing. Mutations are always blocked from bare invocation by the existing `--scope` + `--apply` Authority gate.
+
+When defaulting to status, prepend this note to the output:
+> Note: `/kg-mcp` (no subcommand) maps to `status` (read-only). Mutations require explicit `register --scope <user|project> --apply` or `unregister --scope <user|project> --apply`.
+
 ### `/kg-mcp register --scope <user|project> [--apply]`
 1. Detect target `graph.json` (cwd or arg).
 2. Print the proposed MCP server entry to add to `.mcp.json`:
@@ -64,12 +71,25 @@ Per graphify v0.5.0 `serve.py`. The MCP server is launched by the **graphify sla
 6. Report which MCP tools are now available; instruct user to restart Claude Code session for MCP server to load.
 
 ### `/kg-mcp status`
-1. Inspect both `~/.claude.json` and `<cwd>/.mcp.json`
+1. Inspect both `~/.claude.json` and `<cwd>/.mcp.json` for `graphify-*` MCP server entries
 2. Report:
    - Whether `graphify-*` MCP servers are registered
    - For each, the graph.json path they point to
-   - Freshness of each pointed-to graph.json
-3. Read-only — never edits.
+   - Freshness of each pointed-to graph.json (mtime)
+3. **Outdated-registration sensor (v0.5.5)** — scan project for graphs newer than the registered one:
+   - Scan scope: cwd recursively, EXCLUDE these dirs: `node_modules/`, `.git/`, `__pycache__/`, `*.egg-info/`, `build/`, `dist/`, `vendor/`, `vendored/`, `tmp/`, `.tmp/`, `_archive/`, `_examples/`, `_fixtures/`
+   - Priority order when multiple graphs exist:
+     1. **`graphify-out/merged-graph.json`** at project root (cross-corpus union — most generally useful)
+     2. Any `*/graphify-out/graph.json` (per-corpus graphs)
+   - If a candidate graph has mtime newer than the currently-registered one by ≥ 5 minutes, emit warning:
+     ```
+     ⚠ Outdated registration:
+       Registered: <path> (mtime: <ts>)
+       Newer available: <newer-path> (mtime: <ts>) — type: merged | per-corpus
+       Suggested: /kg-mcp register --scope <X> --apply (with new path)
+     ```
+   - 5-minute grace prevents false positives from filesystem time skew or routine re-runs.
+4. Read-only — never edits.
 
 ### `/kg-mcp unregister [--scope user|project] [--apply]`
 1. Show which `graphify-*` entries exist in target `.mcp.json`
