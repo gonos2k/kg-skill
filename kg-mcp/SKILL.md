@@ -6,7 +6,7 @@ trigger: /kg-mcp
 
 # /kg-mcp — Register graphify MCP Server in Claude Config
 
-Expose the project's graph as 7 MCP tools so other kg skills can query the graph without loading `graph.json` into the LLM context. Hard-depends on graphify v0.5.0+ (`graphify --mcp`).
+Expose the project's graph as 7 MCP tools so other kg skills can query the graph without loading `graph.json` into the LLM context. Hard-depends on graphify v0.5.0+ slash-command orchestrator (`/graphify <path> --mcp` launches the stdio MCP server). Note: the bare CLI `graphify --mcp` returns `error: unknown command '--mcp'` — `--mcp` is a slash-command-only flag, not a raw CLI flag.
 
 ## Activate When
 
@@ -28,9 +28,9 @@ Expose the project's graph as 7 MCP tools so other kg skills can query the graph
 - Target project has `graphify-out/graph.json` (verify mtime per `~/.claude/skills/kg/references/architecture.md` freshness gate)
 - `~/.claude.json` or project-local `.mcp.json` exists and is writable
 
-## MCP tools exposed (by `graphify --mcp`)
+## MCP tools exposed (by `/graphify <path> --mcp`)
 
-Per graphify v0.5.0 `serve.py`:
+Per graphify v0.5.0 `serve.py`. The MCP server is launched by the **graphify slash-command orchestrator**, which spawns a stdio process exposing the tools below. The launch command in `.mcp.json` (set up by `register --apply`) invokes graphify in MCP-server mode via the orchestrator's known entrypoint, not the bare CLI flag.
 
 | Tool | Purpose |
 |---|---|

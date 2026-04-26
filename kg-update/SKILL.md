@@ -26,25 +26,33 @@ Rebuild the structural graph without re-ingesting into wiki. Delegates to Graphi
 ## Flow
 
 1. Detect source directory (`gMeso/vault/` > `raw/` > `docs/` > `.`)
-2. Run `graphify <path> --update` on the source directory
-   - SHA256 cache finds only new/changed files
-   - Code-only changes skip semantic extraction (no LLM cost)
-   - Re-clusters communities, regenerates GRAPH_REPORT.md
-3. If `wiki/` exists, sync GRAPH_REPORT.md into `wiki/graph-report.md`
-4. Report delta: new nodes, removed nodes, community changes
+2. Decision table — pick mode by `(graph exists?, code files present?)`:
 
-## Optional flags (v0.5.0+)
+| graph.json exists? | Code files present? | Mode | Action |
+|---|---|---|---|
+| **No** | **Yes** | `cli-bootstrap` | `graphify update <path>` (CLI does AST-extract from scratch when no graph; verified v0.5.0 — produces graph.json + GRAPH_REPORT.md from 0; no LLM tokens) |
+| **No** | **No** (docs/papers only) | `slash-bootstrap` | Stop CLI; route to `/graphify <path>` (orchestrator does semantic extraction via subagents) |
+| **Yes** | **Yes (changed)** | `cli-update` | `graphify update <path>` (incremental, SHA256 cache) |
+| **Yes** | **No (only docs changed)** | `slash-update` | `/graphify <path> --update` (re-extract docs via subagents) |
 
-- `--cluster-only` — re-cluster existing graph without re-extraction (fast, no LLM)
-- `--mode deep` — thorough extraction with richer INFERRED edges
-- `--directed` — preserve edge direction (source → target)
-- `--watch` — long-running watcher; auto-rebuild on code changes (no LLM needed)
+3. Run the chosen command:
+   - **`cli-bootstrap` / `cli-update`**: `graphify update <path>` — SHA256 cache finds new/changed code files; AST extraction; re-clusters communities; regenerates GRAPH_REPORT.md. No LLM cost.
+   - **`slash-bootstrap` / `slash-update`**: invoke `/graphify <path>` (orchestrator skill). Costs LLM tokens proportional to doc/paper file count.
 
-Use `--cluster-only` after schema/predicate changes; use `--mode deep` for major ingests; use `--watch` for active development sessions.
+4. If `wiki/` exists, sync GRAPH_REPORT.md into `wiki/graph-report.md`
+5. Report delta: new nodes, removed nodes, community changes, mode used.
 
-## Equivalent CLI forms
+## CLI vs slash-command forms
 
-`graphify <path> --update` and `graphify update <path>` both work in v0.5.0+. Prefer the first form for consistency with other graphify flags.
+Two distinct invocation surfaces with different capabilities — do not conflate them:
+
+| Form | Capability | Cost |
+|---|---|---|
+| `graphify update <path>` (CLI) | Re-extract **code files only** against existing graph | No LLM |
+| `/graphify <path> --update` (slash, Claude Code orchestrator) | Re-extract code + docs + papers + images via subagents | LLM tokens |
+| `/graphify <path>` (slash, no flag) | First-time build / semantic extraction on any corpus | LLM tokens |
+
+The `--update / --mode deep / --directed / --svg / --graphml / --neo4j / --mcp / --wiki / --watch / --html` flags exist only in the **slash form** (the graphify SKILL orchestrator implements them via library calls + subagents). They are NOT raw CLI flags in graphify v0.5.0 — invoking `graphify <path> --<flag>` from Bash returns `error: unknown command '<path>'`.
 
 **Technical:** Manifest at `graphify-out/manifest.json`. Graph at `graphify-out/graph.json` (NetworkX node_link_data format, `links` key not `edges`).
 
@@ -55,7 +63,7 @@ Use `--cluster-only` after schema/predicate changes; use `--mode deep` for major
 ```text
 Update result: PASS | PARTIAL | FAIL
 Source dir: <path>
-Mode: standard | --cluster-only | --mode deep | --directed | --watch
+Mode: cli-update | slash-update | bootstrap-needed | cluster-only
 
 Delta:
 - Files scanned: <N>
@@ -65,8 +73,8 @@ Delta:
 - Modified nodes: <N>
 - Community changes: <N> (added/merged/split)
 
-GRAPH_REPORT.md: regenerated | unchanged
-wiki/graph-report.md: synced | skipped (no wiki/) | unchanged
+GRAPH_REPORT.md: regenerated | unchanged | not-yet-built
+wiki/graph-report.md: synced | skipped (no wiki/) | not-yet-built
 
 Files NOT touched (per Phase Lock):
 - .schema/, .schema-proposals/, content wiki pages
@@ -74,19 +82,22 @@ Files NOT touched (per Phase Lock):
 Confidence: high | medium | low
 
 Caveats:
-- <graphify CLI missing | source dir empty | manifest corrupt | none>
+- <graphify CLI missing | graph absent (bootstrap needed) | no code files (CLI no-op) | source dir empty | manifest corrupt | none>
 
 Next command:
-- <none | /kg-orient | /kg-lint | /kg-reflect>
+- <none | /kg-orient | /kg-lint | /kg-reflect | /graphify <path> (bootstrap) | /graphify <path> --update (slash, doc/paper re-extract)>
 ```
 
 ## Exceptions and Escalation
 
 - **Graphify CLI not found** (`which graphify` empty) → suggest `pip install graphifyy` and stop.
 - **Source directory does not exist** → report all 5 detection candidates checked; ask user to specify path explicitly.
+- **Graph absent + non-code corpus only** — if `graphify-out/graph.json` does NOT exist AND the corpus has no code files (only docs/papers/HTML), CLI `update` outputs "Nothing to update" + "[graphify watch] No code files found". Stop, set `Update result: PARTIAL`, `Mode: slash-bootstrap`, and recommend `Next command: /graphify <path>` (slash-command orchestrator does semantic extraction via subagents). Do not retry CLI.
+- **Graph absent + code present** — `graphify update <path>` **does** bootstrap from scratch via AST extraction (verified empirically on graphify v0.5.0; e.g., 33 .py files → 427 nodes, 21 communities, no LLM). This is the "happy path" for code-only first-time runs. Emit `Mode: cli-bootstrap`.
+- **Graph exists + no code changes** — if `graphify update <path>` reports no code files changed since last run, suggest `/graphify <path> --update` (slash form re-extracts docs/papers/images that the CLI ignores). Emit `Mode: slash-update`.
 - **`graphify-out/` write permission denied** → stop; do not attempt fallback location.
 - **Never modify** `.schema/`, `.schema-proposals/`, or content wiki pages. This skill is graph-layer only.
-- **`--watch` mode** → run as background process; user must manually stop. Skill returns immediately after spawn.
+- **`--watch` / `--mode deep` / `--directed` / `--cluster-only` / `--svg` / `--graphml` / `--neo4j` / `--mcp` / `--wiki` modes** → these are slash-command orchestrator features only (not raw CLI). Suggest `/graphify <path> --<flag>` and stop; this skill delegates only the CLI `update` subcommand.
 - **Migration/schema drift** → out of scope; emit message "schema mutation requires `/kg-schema`" and stop.
 
 ## Quality Gates

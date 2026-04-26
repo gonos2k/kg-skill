@@ -57,7 +57,7 @@ Plan:
 
 **Optional graph-based trigger (graphify soft dependency):**
 - If `graphify-out/graph.json` exists AND `mtime < 7 days` (freshness gate), additionally trigger when:
-  - `graphify shortest_path "<new_entity>" "<best_difflib_match>" --max-hops 3` returns ≤ 2 hops (graph-distance proximity to the closest existing title found in Trigger 1).
+  - CLI: `graphify path "<new_entity>" "<best_difflib_match>"` returns ≤ 2 hops (graph-distance proximity to the closest existing title found in Trigger 1). Equivalent MCP tool: `shortest_path(<a>, <b>)` if `/kg-mcp` server is registered.
 - If graph is stale (≥ 7 days) or absent, skip this check and note "graph unavailable, name-similarity-only confirmation" in Caveats.
 
 Otherwise proceed automatically. Default behavior matches Authority Matrix: page identity/classification = Human (when triggered), routine bookkeeping = LLM (see `~/.claude/skills/kg/references/authority-matrix.md`).

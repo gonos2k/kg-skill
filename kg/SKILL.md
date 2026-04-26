@@ -17,8 +17,9 @@ The graph tells you what's connected. The wiki tells you what it means. Either l
 
 - User invokes `/kg`
 - User asks "어떤 kg 명령을 써야 해?" or how the Knowledge Graph + LLM Wiki system works
-- Project contains `wiki/` or `graphify-out/` and needs orientation
 - User asks about the overall KG/Wiki architecture, ontology, or authority rules
+
+Project-state auto-trigger (`wiki/` or `graphify-out/` presence at session start) routes to `/kg-orient`, **not** this router. See `kg-orient/SKILL.md`.
 
 ## Do Not Activate When
 

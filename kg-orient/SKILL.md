@@ -48,7 +48,8 @@ If reflect_debt >= 3, append: "Reflect 권장 — `/kg-reflect` 실행을 고려
 ## graphify integration (when available)
 
 If `graphify-out/graph.json` exists AND `mtime < 7 days` (freshness gate per `~/.claude/skills/kg/references/architecture.md`):
-- Optional: invoke `graphify <path> --mcp` background server, then call `god_nodes(top_n=5)` and `graph_stats` MCP tools for richer orientation than reading GRAPH_REPORT.md alone.
+- **MCP path** (preferred): if `/kg-mcp` has registered the graphify MCP server in `.mcp.json`, the 7 graph tools (`god_nodes`, `graph_stats`, `query_graph`, `get_node`, `get_neighbors`, `get_community`, `shortest_path`) are exposed natively to Claude Code. Call `god_nodes(top_n=5)` + `graph_stats` for richer orientation than reading GRAPH_REPORT.md alone. To launch the MCP server in this session if not yet registered, invoke the slash command `/graphify <path> --mcp` (the graphify SKILL orchestrator starts a stdio MCP server). Note: `--mcp` is a slash-command-only flag; the bare CLI `graphify --mcp` returns `unknown command`.
+- **CLI fallback** (no MCP): only `graphify path "A" "B"` (shortest_path equivalent) is exposed. `god_nodes` / `graph_stats` are MCP-only — read GRAPH_REPORT.md instead.
 - If graph stale (≥7d) or absent, fall back to GRAPH_REPORT.md only and note in Caveats.
 
 ## Source directory detection (checked in order)

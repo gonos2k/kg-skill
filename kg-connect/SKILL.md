@@ -51,8 +51,8 @@ Skip pairs that are *intentionally isolated* (e.g., legacy + active) — note th
 ## graphify integration (when available)
 
 If `graphify-out/graph.json` exists AND `mtime < 7 days`:
-- Call `get_community(community_id)` to enumerate community members objectively (vs reading GRAPH_REPORT.md text)
-- Call `shortest_path(<anchor_A>, <anchor_B>, max_hops=8)` to verify the proposed bridge isn't already implicit (existing path) — only propose when shortest_path > 3 or returns no path
+- **Via MCP** (preferred when `/kg-mcp` server is registered): call `get_community(community_id)` to enumerate community members objectively (vs reading GRAPH_REPORT.md text); call `shortest_path(<anchor_A>, <anchor_B>, max_hops=8)` to verify the proposed bridge isn't already implicit (existing path) — only propose when shortest_path > 3 or returns no path.
+- **Via CLI** (fallback when MCP not registered): use `graphify path "<anchor_A>" "<anchor_B>"` for shortest_path. `get_community` is MCP-only — read GRAPH_REPORT.md instead.
 - If graph stale (≥7d) → suggest `/kg-update` first; this skill cannot operate reliably on stale community structure.
 
 ## Risks (false bridge)

@@ -94,8 +94,8 @@ Let the user decide which (if any) to act on.
 ## graphify integration (when available)
 
 If `graphify-out/graph.json` exists AND `mtime < 7 days`:
-- Call `shortest_path` between top-3 god nodes from each community → cross-community emerging cluster detection
-- Call `god_nodes(top_n=10)` for richer "anchor pages" sample (vs reading GRAPH_REPORT.md alone)
+- **Via MCP** (preferred when `/kg-mcp` server is registered): call MCP tools `shortest_path(a, b)` between top-3 god nodes from each community → cross-community emerging cluster detection; call `god_nodes(top_n=10)` for richer "anchor pages" sample (vs reading GRAPH_REPORT.md alone).
+- **Via CLI** (fallback when MCP not registered): only `graphify path "A" "B"` (shortest_path equivalent) is exposed. `god_nodes` is MCP-only — read GRAPH_REPORT.md instead.
 - If graph stale (≥7d) or absent, fall back to wiki-only sampling and note in Caveats.
 
 ## Update side effects (allowed by Authority Matrix)
