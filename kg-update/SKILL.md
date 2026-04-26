@@ -39,8 +39,27 @@ Rebuild the structural graph without re-ingesting into wiki. Delegates to Graphi
    - **`cli-bootstrap` / `cli-update`**: `graphify update <path>` — SHA256 cache finds new/changed code files; AST extraction; re-clusters communities; regenerates GRAPH_REPORT.md. No LLM cost.
    - **`slash-bootstrap` / `slash-update`**: invoke `/graphify <path>` (orchestrator skill). Costs LLM tokens proportional to doc/paper file count.
 
-4. If `wiki/` exists, sync GRAPH_REPORT.md into `wiki/graph-report.md`
+4. If `wiki/` exists, sync GRAPH_REPORT.md into wiki — see § Multi-corpus naming convention.
 5. Report delta: new nodes, removed nodes, community changes, mode used.
+
+## Multi-corpus naming convention (added v0.5.4)
+
+A project may track **multiple separately-graphed corpora** (e.g., our own code + cloned reference repos). Single-file sync overwrites prior reports. Use this convention:
+
+| State | Wiki file | Role |
+|---|---|---|
+| Single corpus | `wiki/graph-report.md` | The report itself (existing v0.5.x behavior) |
+| Multi corpus (≥2) | `wiki/graph-report-<corpus-slug>.md` (one per corpus) | Per-corpus report |
+| Multi corpus | `wiki/graph-report.md` | INDEX page listing all per-corpus reports + multi-corpus convention note |
+
+**Detection rule for kg-update**:
+- If `wiki/graph-report.md` does NOT exist → write the report to `wiki/graph-report.md` (single-corpus path).
+- If `wiki/graph-report.md` exists AND was previously the report (no INDEX header) AND we're now syncing a DIFFERENT corpus → migrate: rename existing file to `wiki/graph-report-<old-slug>.md` and write index in `wiki/graph-report.md` with both entries.
+- If `wiki/graph-report.md` is already an INDEX → simply add new corpus row + write `wiki/graph-report-<new-slug>.md`.
+
+**Slug derivation**: from the corpus root directory name (e.g., `eml-net`, `SymbolicRegressionPackage`), kebab-cased lowercase: `eml-net`, `symbolic-regression-package`.
+
+**Why**: a real project (this very wiki, 2026-04-26) has both our own implementation (`eml-net/`) and external references (`refs/SymbolicRegressionPackage/`). Single-file sync would silently destroy whichever was synced earlier. Index-with-per-corpus pattern preserves history.
 
 ## CLI vs slash-command forms
 

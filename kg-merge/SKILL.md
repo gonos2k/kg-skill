@@ -113,6 +113,14 @@ Next command:
 - **All sources stale (≥7d)** → require explicit user confirmation to merge stale data; default behavior is to suggest refreshing via `/kg-update` first.
 - **Output path overwrites a non-merged `graph.json`** → refuse. Resolve the proposed `--out` path to its canonical absolute form (`Path.resolve()`), then refuse if it equals the canonical path of `graphify-out/graph.json` for the cwd OR for any input source. Symlinks resolve to their target; relative paths resolve against cwd. The output must be `merged-graph.json` or any path that does not collide with an input `graph.json`.
 - **Never modify** input project sources, their `wiki/`, or their `graphify-out/graph.json`. This skill is read-only on inputs and write-only to the merged output.
+- **`graphify cluster-only` does NOT work on merged-graph.json directly** (graphify v0.5.0 limitation, verified 2026-04-26 dogfooding). The CLI expects `<path>/graphify-out/graph.json` directory layout and rejects arbitrary file paths with `error: no graph found at .../graphify-out/graph.json — run /graphify first`. Workarounds:
+  1. **Symlink trick**: `mkdir -p /tmp/m/graphify-out && ln -s <abs-path-to-merged> /tmp/m/graphify-out/graph.json && graphify cluster-only /tmp/m`
+  2. **Direct Python analysis**: load the merged JSON (NetworkX `node_link_data` format, `links` key not `edges`) and run `networkx.community.louvain_communities(G)` or similar — bypasses graphify CLI altogether.
+  Without re-clustering, the merged graph **keeps community labels from each input source unchanged** (no Leiden re-clustering across the union). Cross-source community detection requires the workaround.
+- **`merge-graphs` does NOT auto-detect cross-source bridges** — it produces a **UNION** graph (concatenation). Bridges between conceptually-related nodes with different identifiers (e.g., your reimplementation's `EML` class vs paper's `compile_to_eml` function) require either:
+  1. **Manual annotation**: post-process the merged JSON to add explicit cross-edges
+  2. **LLM-based semantic matching**: out of CLI scope; use `/kg-connect` workflow on the merged graph after Claude Code restart with MCP server activated
+  Empirically (2026-04-26): merging eml-net (162n/303e) + SymbolicRegressionPackage (427n/1076e) → 589n/1379e, **0 cross-source edges**, **0 label collisions** (entirely disjoint identifiers). Cross-source bridges come from semantic understanding, not graphify's union operation.
 
 ## Quality Gates
 

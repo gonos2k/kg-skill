@@ -34,6 +34,23 @@ FRONTMATTER_RE = re.compile(r"^---\n(.+?)\n---\n", re.DOTALL)
 # Files that are bookkeeping / meta — not content pages
 META_FILENAMES = {"hot.md", "log.md", "overview.md", "graph-report.md", "index.md"}
 
+# Wikilink targets that are NOT wiki pages — skip in missing-check.
+# Background:
+#   graphify generates Obsidian-style community hub anchors like
+#   `[[_COMMUNITY_Community 0]]` inside its GRAPH_REPORT.md output. These are
+#   internal navigation, not pages that should exist in the wiki.
+#   Similarly, `[[refs/...]]` references denote external code mirrors (read-only)
+#   not wiki pages — convention introduced in kg-skill v0.5.2/v0.5.3 dogfooding.
+EXTERNAL_REF_PATTERNS = [
+    re.compile(r"^_COMMUNITY_"),   # graphify community hubs
+    re.compile(r"^refs/"),         # code reference repos (external mirrors)
+]
+
+
+def is_external_ref(target: str) -> bool:
+    """True if target is an intentional non-wiki reference (skip missing-check)."""
+    return any(p.match(target) for p in EXTERNAL_REF_PATTERNS)
+
 
 def parse_page(path: Path) -> tuple[dict, str]:
     text = path.read_text(encoding="utf-8-sig")
@@ -90,6 +107,8 @@ def detect_missing(pages) -> dict[str, list[str]]:
     missing: dict[str, list[str]] = defaultdict(list)
     for slug, (_path, _fm, body) in pages.items():
         for target in find_wikilinks(body):
+            if is_external_ref(target):
+                continue  # graphify community refs, code refs — intentional non-wiki targets
             if normalize_target(target) not in pages:
                 missing[target].append(slug)  # keep original form for the report
     return dict(missing)
