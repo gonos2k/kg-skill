@@ -2,157 +2,308 @@
 
 > **Language / 언어:** **English** | [한국어](README.ko.md)
 
-Knowledge Graph + LLM Wiki skill for [Claude Code](https://claude.ai/claude-code).
+A Knowledge Graph + LLM Wiki skill set for [Claude Code](https://claude.ai/claude-code).
 
-An extension of [Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — persistent, compounding knowledge base where the LLM writes and maintains a structured wiki while the human curates sources and asks questions.
+Build a **persistent, compounding knowledge base** for any project. The LLM curates a structured wiki, [Graphify](https://github.com/safishamsi/graphify) extracts the structural graph, and you keep both layers in sync with **18 deterministic slash commands** that follow a single 5-formula contract.
 
-## What this adds beyond Karpathy's pattern
+Inspired by [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) and extended with a 7-class ontology, proposal-first schema evolution, receipt-based quality gates, and graphify v0.5.0+ MCP integration.
 
-- **Structural graph** — Leiden clustering-based community detection, god nodes, surprising cross-document connections via [Graphify](https://github.com/safishamsi/graphify)
-- **Graph-only mode** — works without wiki setup; orient/query/update against the graph alone
-- **Incremental updates** — SHA256 cache detects changed files; code-only changes skip LLM extraction
-- **Verification chain** — Graph → Wiki → Raw Source (3-layer trust hierarchy)
-- **Dialogue operations** — the LLM is a thinking partner, not just a scribe
-- **Evolving ontology** — 7 knowledge classes (Artifact, Concept, Source, Procedure, Experience, Heuristic, Decision) with proposal-first schema evolution and receipt-based quality gates
+---
 
-## Slash Commands
+## Why this might help you
 
-### Data Operations
+You probably already have many of the pieces:
 
-| Command | Description |
-|---------|-------------|
-| `/kg` | Full reference + orientation |
-| `/kg-orient` | Session start summary — graph/wiki status, god nodes, freshness |
-| `/kg-init` | Bootstrap wiki directory — copy schema, create folders, idempotent |
-| `/kg-update` | Incremental graph rebuild (delegates to Graphify `--update`) |
-| `/kg-ingest` | Ingest source files into wiki with discussion and key takeaways |
-| `/kg-query` | BFS/DFS graph traversal + wiki lookup |
-| `/kg-lint` | Health check — graph integrity, orphan pages, missing links, schema validation |
+- **A folder of papers/code/notes** — but you forget what's connected to what
+- **A vague memory** — "I read something about this six months ago…"
+- **A growing wiki** — but it drifts out of sync with the code or with your evolving understanding
+- **Many AI sessions** — but each one starts from zero
 
-### Dialogue Operations
+`kg-skill` gives Claude a **single, structured way** to remember across sessions:
 
-| Command | Description |
-|---------|-------------|
-| `/kg-reflect` | Surface tensions, emerging patterns, blind spots, shifted ground |
-| `/kg-challenge` | Devil's advocate — argue against a wiki claim using only evidence |
-| `/kg-connect` | Find missing bridges between graph communities |
-| `/kg-suggest` | Recommend what to read/ingest next based on knowledge gaps |
-| `/kg-elicit` | Surface tacit knowledge — create Experience and Heuristic pages via dialog |
-| `/kg-autoresearch` | Autonomous multi-round web research loop |
-
-### Schema Operations
-
-| Command | Description |
-|---------|-------------|
-| `/kg-schema` | Evolve the ontology — propose/approve/migrate/diff/list |
-| `/kg-canvas` | Export wiki knowledge as Obsidian Canvas for visualization |
-| `/kg-postmortem` | Structured trial-and-error capture (attempted → outcome → lesson) |
-
-## Ontology (v1)
-
-Seven knowledge classes with structured frontmatter contracts.
-
-| Class | Purpose | page_kind |
-|-------|---------|-----------|
-| **Artifact** | Code entities (functions, modules, kernels) | entity, kernel, module |
-| **Concept** | Domain concepts and theories | concept, theory, overview |
-| **Source** | Paper and document summaries | paper, manual, spec |
-| **Procedure** | Step-by-step processes | procedure, workflow, recipe |
-| **Experience** | Trial-and-error episodes | episode, session, incident |
-| **Heuristic** | Rules of thumb and lessons | rule, guideline, pattern |
-| **Decision** | Design decisions with rationale | decision, trade-off |
-
-### Schema Evolution
-
-All schema changes follow a proposal-first workflow:
-
-```
-/kg-reflect (detect drift)
-  → /kg-schema propose (create proposal)
-    → /kg-schema approve (collect receipt + gate check)
-      → /kg-schema apply (modify schema files)
-        → /kg-schema migrate (update affected pages)
+```text
+You              kg-skill                    Claude across sessions
+────────         ─────────────────           ──────────────────────
+"ingest paper" → /kg-ingest paper.pdf  →    knows the paper, links to your concepts
+"why X over Y?" → /kg-query --depth deep →  cites your past decisions with evidence
+"review wiki"   → /kg-reflect          →    surfaces tensions you didn't see
+"audit it"      → /kg-lint             →    finds dead links, stale claims, schema drift
 ```
 
-**Receipt-based quality gate**: `validate.py --receipt` runs 6 sensors. All Required-tier checks (schema_diff, template_contract, frontmatter_valid, legacy_compat, evidence_pages) must PASS before approval proceeds.
+Every operation is **deterministic where possible** (BM25 search, graph traversal, validator scripts) and **human-gated where authority matters** (schema changes, page deletion, source approval).
 
-## Installation
+---
 
-Copy skill directories into `~/.claude/skills/`:
+## Quick Start (5 minutes)
 
 ```bash
-cp -r kg kg-orient kg-update kg-query kg-lint kg-ingest \
-      kg-reflect kg-challenge kg-connect kg-suggest \
-      kg-init kg-schema kg-elicit kg-postmortem \
-      kg-autoresearch kg-canvas \
-      ~/.claude/skills/
+# 1. Install graphify (graph extraction backend)
+pip install graphifyy
+
+# 2. Install kg-skill into Claude
+git clone https://github.com/gonos2k/kg-skill.git ~/kg-skill-source
+cd ~/kg-skill-source
+cp -r kg kg-* ~/.claude/skills/
+
+# 3. In Claude Code, bootstrap a wiki
+/kg-init
+
+# 4. Drop a paper or code repo into raw/ and ingest
+/kg-ingest raw/my-paper.pdf
+
+# 5. Ask questions
+/kg-query "what does my paper say about X?"
+
+# 6. After a few ingests, surface insights
+/kg-reflect
 ```
 
-Add to `~/.claude/CLAUDE.md`:
+That's it. Every skill follows the same 5-formula structure (see below) and produces predictable Output Contracts.
 
-```markdown
-## kg (knowledge-graph)
-- **kg** (`~/.claude/skills/kg/SKILL.md`) - Knowledge graph + LLM wiki.
-  Sub-commands: /kg-orient, /kg-update, /kg-query, /kg-lint, /kg-ingest,
-  /kg-reflect, /kg-challenge, /kg-connect, /kg-suggest
-When the user types /kg or any sub-command, invoke the Skill tool with the matching skill name.
-When wiki/ or graphify-out/ exists in the project, proactively orient at session start.
+---
+
+## The 5-Formula Standard
+
+Every `kg-*` skill is structured the same way, so Claude behaves consistently:
+
+| Section | What it answers |
+|---|---|
+| **YAML Trigger** | When should this skill activate? (specific phrases, project state) |
+| **Activate When / Do Not Activate When** | Explicit positive + negative triggers — prevents skill collision |
+| **Workflow** | Step-by-step plan including a "stop condition" |
+| **Output Contract** | A fenced `text` block with standard fields (`Confidence:`, `Caveats:`, `Next command:`) — see [`kg/references/output-contract-standard.md`](kg/references/output-contract-standard.md) |
+| **Examples + Exceptions and Escalation** | Concrete usage + every escape hatch closed (e.g., "user 'yes' is not approval") |
+
+This means the LLM **cannot improvise where authority matters**. Try it: invoke any `/kg-*` command and you'll get the same shape every time.
+
+---
+
+## Slash Commands (18)
+
+### Data operations — accumulate knowledge
+
+| Command | Purpose |
+|---|---|
+| `/kg-init` | Bootstrap a wiki (schema, folders, indexes). Idempotent. |
+| `/kg-ingest` | Read a source, discuss takeaways, write source/entity/concept pages with [[wikilinks]]. |
+| `/kg-update` | Refresh the structural graph (delegates to `graphify <path> --update`). |
+| `/kg-query` | BFS/DFS traversal + wiki lookup. `--depth quick\|standard\|deep`. |
+| `/kg-lint` | Health check — orphan pages, dead links, stale claims, proposal debt. |
+| `/kg-orient` | Read-only session start summary (hot.md, graph stats, freshness). |
+
+### Dialogue operations — make the LLM a thinking partner
+
+| Command | Purpose |
+|---|---|
+| `/kg-reflect` | Surface tensions, emerging patterns, blind spots, schema drift. Not a summary — only non-obvious insights. |
+| `/kg-challenge` | Devil's advocate. Argues against a wiki claim **using only existing evidence**. |
+| `/kg-connect` | Find missing bridges between graph communities. Never auto-adds edges. |
+| `/kg-suggest` | Recommend next sources/actions based on real knowledge gaps. |
+| `/kg-elicit` | Capture tacit knowledge from dialogue → Experience (always) + optional Heuristic. |
+| `/kg-postmortem` | Stricter `/kg-elicit` for recent discrete failures (verbatim error preserved). |
+| `/kg-autoresearch` | Supervised multi-round web research. Queues findings for explicit user approval — never auto-ingests. |
+
+### Governance & integration
+
+| Command | Purpose |
+|---|---|
+| `/kg-schema` | Evolve the ontology — `propose`, `approve`, `apply`, `migrate`, `diff`, `list`, `pull-global`. Receipt-gated. |
+| `/kg-canvas` | Export wiki as Obsidian Canvas (`.canvas` JSON). Read-only. |
+| `/kg-merge` | **NEW** — Cross-project KG via `graphify merge-graphs` (multiple repos → one merged graph). |
+| `/kg-mcp` | **NEW** — Register `graphify --mcp` in `.mcp.json` so other skills query the graph as MCP tools (no graph.json reload). `--apply` Authority gate. |
+
+### The router
+
+| Command | Purpose |
+|---|---|
+| `/kg` | Router — explains the system or routes you to the right sub-command. Does not execute operations itself. |
+
+---
+
+## Ontology (v1) — 7 classes
+
+Each wiki page is one class with structured frontmatter:
+
+| Class | Purpose | Folder |
+|---|---|---|
+| **Artifact** | Code entities (functions, modules, kernels) | `wiki/entities/` |
+| **Concept** | Domain concepts and theories | `wiki/concepts/` |
+| **Source** | Paper / document / URL summaries | `wiki/sources/` |
+| **Procedure** | Step-by-step processes | `wiki/procedures/` |
+| **Experience** | Trial-and-error episodes (kept verbatim) | `wiki/experiences/` |
+| **Heuristic** | Distilled rules of thumb | `wiki/heuristics/` |
+| **Decision** | Design decisions with rationale | `wiki/decisions/` |
+
+### Schema evolution (proposal-first)
+
+```text
+/kg-reflect (detect drift)
+    → /kg-schema propose (file proposal)
+        → /kg-schema approve (collect receipt + 6-sensor gate)
+            → /kg-schema apply (only if Receipt passed)
+                → /kg-schema migrate (update affected pages)
 ```
 
-## Dependencies
+**Authority Matrix** (per [`kg/references/authority-matrix.md`](kg/references/authority-matrix.md))
 
-- [graphify](https://github.com/safishamsi/graphify) (`pip install graphifyy`) — structural graph extraction
-- [Obsidian](https://obsidian.md/) (optional) — browse the wiki with graph view and wikilinks
+| Action | Authority | Why |
+|---|---|---|
+| Schema change | **Human** | Ontology is the contract |
+| Page reclassification / deletion | **Human** | Folder change = identity change |
+| Source approve (autoresearch) | **Human** | Provenance integrity |
+| Heuristic promotion from Experience | **Human** | Generalization is a judgment call |
+| `hot.md` / `log.md` / `_index.md` updates | **LLM** | Bookkeeping, regenerable |
+| `pull-global` compatible changes | **LLM (dry-run first)** | Always preview |
+
+---
 
 ## Architecture
 
-```
+```text
 project/
-├── <source-dir>/            # Layer 1: Raw sources (immutable)
-├── wiki/                    # Layer 2: LLM-maintained wiki
-│   ├── .schema/             #   Per-wiki schema pin
-│   ├── .schema-proposals/   #   Pending schema proposals
-│   ├── index.md             #   Content catalog
-│   ├── hot.md               #   Current focus + maintenance debt
-│   ├── overview.md          #   Project overview
-│   ├── log.md               #   Chronological record
-│   ├── entities/            #   Artifact pages
-│   ├── concepts/            #   Concept pages
-│   ├── sources/             #   Source summaries
-│   ├── procedures/          #   Step-by-step processes
-│   ├── experiences/         #   Trial-and-error episodes
-│   ├── heuristics/          #   Rules and lessons
-│   ├── decisions/           #   Design decisions
-│   └── queries/             #   Query result cache
-├── graphify-out/            # Structural graph layer
-│   ├── graph.json           #   Nodes, edges, communities
-│   ├── manifest.json        #   Hashes for incremental updates
-│   └── GRAPH_REPORT.md      #   God nodes, surprises
-└── CLAUDE.md                # Schema conventions and workflows
+├── <source-dir>/             # Layer 1 — Raw sources (immutable)
+│   └── (auto-detected: gMeso/vault/, raw/, docs/, or .)
+├── wiki/                     # Layer 2 — LLM-maintained wiki
+│   ├── .schema/              #   Per-wiki schema pin (copied on /kg-init)
+│   ├── .schema-proposals/    #   Pending proposals + receipts
+│   ├── .research-queue/      #   /kg-autoresearch staging (approved/rejected)
+│   ├── index.md              #   Content catalog (last-resort read)
+│   ├── hot.md                #   ~500-word session context cache
+│   ├── overview.md           #   Stable global synthesis
+│   ├── log.md                #   Append-only operation history
+│   ├── entities/             #   Artifact pages
+│   ├── concepts/             #   Concept pages
+│   ├── procedures/           #   Procedure pages
+│   ├── experiences/          #   Experience pages
+│   ├── heuristics/           #   Heuristic pages
+│   ├── decisions/            #   Decision pages
+│   ├── sources/              #   Source summaries
+│   └── queries/              #   Filed query results
+└── graphify-out/             # Structural graph layer (graphify v0.5.0+)
+    ├── graph.json            #   NetworkX node_link_data
+    ├── GRAPH_REPORT.md       #   God nodes, communities, surprises
+    ├── graph.html            #   Interactive HTML (default)
+    ├── manifest.json         #   SHA256 manifest for incremental updates
+    ├── memory/               #   Q&A feedback loop
+    ├── merged-graph.json     #   Cross-repo merge output
+    └── (optional: graph.svg, graph.graphml, cypher.txt)
 ```
 
-### Naming Convention
+### Verification chain
 
-- **`/kg-<verb>`** (hyphen) — canonical user-facing commands. Sub-skill `trigger:` fields use this form.
-- **`/kg <verb>`** (space) — prose notation for readability. Always use the hyphenated form when invoking.
+**Graph → Wiki → Raw Source** is the trust hierarchy. The wiki is **derived**; the raw source is **authoritative**. `/kg-query` cites raw sources for any decision-grade answer.
 
-## Interaction Principles
+### Two operating modes
 
-1. **Asymmetric roles** — Human provides judgment and direction. LLM provides recall, cross-referencing, and pattern detection across documents.
-2. **Productive friction** — Agreement is cheap. The valuable interaction happens when the LLM surfaces contradictions, gaps, or unexpected connections.
-3. **Filed dialogue** — Insights from reflect, challenge, and connect are filed back into the wiki. The dialogue itself compounds.
-4. **Schema as product** — The schema (`core.yaml` + `relations.yaml`) is not infrastructure — it IS the domain model. All changes are proposal-first.
+- **Graph-only**: only `graphify-out/` exists. `/kg-orient`, `/kg-query`, `/kg-update` work alone.
+- **Graph + Wiki**: both exist. The wiki adds semantic depth to the structural graph.
 
-## Tools
+---
 
-| File | Purpose |
-|------|---------|
-| `kg/schema/tools/validate.py` | Frontmatter validation, relation domain/range checks, receipt generation |
-| `kg/schema/tools/build_search_index.py` | Build BM25 search index for wiki |
-| `kg/schema/core.yaml` | Class definitions, epistemic states, confidence levels |
-| `kg/schema/relations.yaml` | Predicate definitions with domain/range constraints |
-| `kg/schema/frontmatter.yaml` | Field types and enumerations |
-| `kg/templates/*.md` | Per-class page templates |
+## References library
+
+`kg/references/` — load on demand by Claude (progressive disclosure):
+
+| File | Topic |
+|---|---|
+| [`architecture.md`](kg/references/architecture.md) | Layout, source detection, page templates, technical notes |
+| [`ontology.md`](kg/references/ontology.md) | 7 classes, page_kind, instance_of, schema-as-product, proposal/receipt |
+| [`authority-matrix.md`](kg/references/authority-matrix.md) | Human vs LLM authority, hot.md priority, novelty test |
+| [`context-compression.md`](kg/references/context-compression.md) | BM25 search, hot/overview/_index hierarchy, archive policy |
+| [`schema-evolution.md`](kg/references/schema-evolution.md) | Migration policy, supersession, convergence tracking |
+| [`codex-integration.md`](kg/references/codex-integration.md) | Bidirectional Codex pipeline (review filing, domain context injection) |
+| [`output-contract-standard.md`](kg/references/output-contract-standard.md) | Standard Output Contract field names — `Next command:`, `Confidence:`, `Caveats:` |
+
+---
+
+## Helper tools
+
+`kg/schema/tools/` — deterministic helpers offload work from LLM judgment:
+
+| Script | Purpose |
+|---|---|
+| `validate.py` | Frontmatter validation, relation domain/range checks, receipt generation |
+| `build_search_index.py` | BM25 search index builder (Korean+English CJK tokenizer) |
+| `check_skill_frontmatter.py` | Validate every SKILL.md (YAML, required keys, trigger equality, body forbidden patterns) |
+| `kg_lint.py` | Wiki sensor — orphan pages, missing wikilinks, deprecated-without-callout, supersession orphans |
+| `extract_claims.py` | Parse `> [!claim]`, `> [!evidence]`, `> [!tension]` callouts → JSON for `/kg-query` and `/kg-challenge` |
+
+---
+
+## graphify integration (soft dependency)
+
+11 sub-skills automatically use [graphify](https://github.com/safishamsi/graphify) v0.5.0+ when available, falling back gracefully when absent or stale.
+
+**Freshness gate**: `graphify-out/graph.json` is treated as authoritative only when `mtime < 7 days`. Stale graphs degrade to wiki-only / BM25-only paths and note the staleness in `Caveats:`.
+
+**MCP server tools** (via `graphify <path> --mcp`):
+
+| Tool | Used by |
+|---|---|
+| `query_graph` | `/kg-query` (BFS/DFS with token budget) |
+| `get_node` / `get_neighbors` | `/kg-challenge`, `/kg-elicit` |
+| `get_community` | `/kg-connect`, `/kg-suggest` |
+| `god_nodes` | `/kg-orient`, `/kg-suggest` |
+| `graph_stats` | `/kg-orient`, `/kg-lint` |
+| `shortest_path` | `/kg-ingest` (confirmation gate), `/kg-postmortem` (pattern detection), `/kg-connect` (objective distance) |
+
+Register MCP server with `/kg-mcp register --scope project --apply`.
+
+---
+
+## Installation
+
+### Requirements
+
+- Python ≥ 3.10
+- [graphify](https://github.com/safishamsi/graphify) v0.5.0+: `pip install graphifyy`
+- [Obsidian](https://obsidian.md/) (optional, for browsing wiki with graph view)
+
+### Install skills
+
+```bash
+git clone https://github.com/gonos2k/kg-skill.git
+cd kg-skill
+cp -r kg kg-* ~/.claude/skills/
+```
+
+### Add to `~/.claude/CLAUDE.md`
+
+```markdown
+## kg (knowledge-graph)
+- **kg** (`~/.claude/skills/kg/SKILL.md`) — Knowledge graph + LLM wiki router.
+  Sub-commands: /kg-orient, /kg-update, /kg-query, /kg-lint, /kg-ingest,
+  /kg-reflect, /kg-challenge, /kg-connect, /kg-suggest, /kg-elicit,
+  /kg-postmortem, /kg-schema, /kg-autoresearch, /kg-canvas, /kg-merge, /kg-mcp.
+When the user types /kg or any sub-command, invoke the Skill tool with the matching skill name.
+When wiki/ or graphify-out/ exists in the project, the kg-orient skill auto-suggests at session start.
+```
+
+### Verify install
+
+```bash
+python3 ~/.claude/skills/kg/schema/tools/check_skill_frontmatter.py
+# expected: PASS — 18 SKILL.md files OK
+```
+
+---
+
+## Naming convention
+
+- **`/kg-<verb>`** (hyphen) — canonical user-facing slash command. Always use this form.
+- **`/kg <verb>`** (space) — never used; the hyphenated form is ground truth in every sub-skill's `trigger:` field.
+
+---
+
+## Interaction principles
+
+1. **Asymmetric roles** — Human provides judgment and direction. LLM provides recall, cross-referencing, and pattern detection.
+2. **Productive friction** — Agreement is cheap. Value comes when the LLM surfaces contradictions, gaps, or unexpected connections.
+3. **Filed dialogue** — Insights from `/kg-reflect`, `/kg-challenge`, `/kg-connect` are filed back into the wiki. The dialogue itself compounds.
+4. **Schema as product** — `core.yaml` + `relations.yaml` is not infrastructure — it IS the domain model. All changes proposal-first.
+5. **Deterministic > LLM judgment** — When a check can be a script (BM25, graph distance, frontmatter validation), it should be. LLM judgment is reserved for content questions.
+
+---
 
 ## License
 
