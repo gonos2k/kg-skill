@@ -2,157 +2,308 @@
 
 > **언어 / Language:** [English](README.md) | **한국어**
 
-[Claude Code](https://claude.ai/claude-code) 용 지식 그래프 + LLM 위키 스킬.
+[Claude Code](https://claude.ai/claude-code)용 지식 그래프 + LLM 위키 스킬 세트.
 
-[Karpathy의 LLM Wiki 패턴](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)을 확장한 것으로, LLM이 구조화된 위키를 작성·유지하고 인간이 소스를 큐레이션하고 질문하는 영속적·축적형 지식 베이스입니다.
+프로젝트마다 **영속적·축적형 지식 베이스**를 만듭니다. LLM은 구조화된 위키를 큐레이션하고, [Graphify](https://github.com/safishamsi/graphify)는 구조 그래프를 추출하며, **5공식 표준을 따르는 18개의 결정론적 슬래시 커맨드**가 두 계층을 동기화합니다.
 
-## Karpathy 패턴 대비 추가점
+[Andrej Karpathy의 LLM Wiki 패턴](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)에서 출발해 7-class 온톨로지, proposal-first 스키마 진화, receipt 기반 품질 게이트, graphify v0.5.0+ MCP 통합으로 확장.
 
-- **구조 그래프** — [Graphify](https://github.com/safishamsi/graphify) 기반 Leiden 클러스터링으로 커뮤니티 감지, 갓 노드, 문서 간 비자명 연결 자동 발견
-- **그래프 전용 모드** — 위키 설정 없이 그래프만으로 orient/query/update 가능
-- **증분 갱신** — SHA256 캐시로 변경 파일만 감지, 코드 전용 변경은 LLM 추출 건너뜀
-- **검증 체인** — Graph → Wiki → Raw Source (3계층 신뢰 위계)
-- **대화 운영** — LLM이 단순 서기가 아닌 사고 파트너 역할
-- **진화형 온톨로지** — 7개 클래스(Artifact, Concept, Source, Procedure, Experience, Heuristic, Decision), proposal-first 스키마 변경, receipt 기반 품질 게이트
+---
 
-## 슬래시 커맨드
+## 왜 도움이 될 수 있나
 
-### 데이터 운영 (지식 축적)
+이미 갖고 계신 조각들이 있을 겁니다:
 
-| 커맨드 | 설명 |
-|--------|------|
-| `/kg` | 전체 레퍼런스 + 오리엔테이션 |
-| `/kg-orient` | 세션 시작 요약 — 그래프/위키 상태, 갓 노드, 신선도 |
-| `/kg-init` | 위키 디렉토리 부트스트랩 — 스키마 복사, 폴더 생성, 멱등(재실행 안전) |
-| `/kg-update` | 증분 그래프 재빌드 (Graphify `--update` 위임) |
-| `/kg-ingest` | 소스 파일을 위키로 인제스트 — 토론, 핵심 요약, 페이지 생성 |
-| `/kg-query` | BFS/DFS 그래프 순회 + 위키 검색 |
-| `/kg-lint` | 건강 점검 — 그래프 무결성, 고아 페이지, 누락 링크, 스키마 검증 |
+- **논문/코드/노트가 쌓인 폴더** — 그런데 무엇이 무엇과 연결되는지 잊어버림
+- **희미한 기억** — "6개월 전에 이거랑 비슷한 거 봤는데..."
+- **점점 커지는 위키** — 그런데 코드나 본인의 이해와 점점 어긋남
+- **여러 AI 세션** — 매번 처음부터 다시 시작
 
-### 대화 운영 (상호 작용)
+`kg-skill`은 Claude에게 **세션을 가로질러 기억하는 단일·구조화된 방법**을 줍니다:
 
-| 커맨드 | 설명 |
-|--------|------|
-| `/kg-reflect` | 긴장, 새 패턴, 사각지대, 바뀐 전제 발견 |
-| `/kg-challenge` | 악마의 변호인 — 위키 주장에 근거로만 반박 |
-| `/kg-connect` | 커뮤니티 간 누락된 다리 발견 |
-| `/kg-suggest` | 지식 갭 기반 다음 읽기/인제스트 추천 |
-| `/kg-elicit` | 암묵지 추출 — 대화를 통해 경험·휴리스틱 페이지 생성 |
-| `/kg-autoresearch` | 자율 다중 라운드 웹 리서치 루프 |
-
-### 스키마 운영
-
-| 커맨드 | 설명 |
-|--------|------|
-| `/kg-schema` | 온톨로지 진화 — propose/approve/migrate/diff/list |
-| `/kg-canvas` | Obsidian Canvas 내보내기 — 지식 시각화 |
-| `/kg-postmortem` | 시행착오 기록 — attempted → outcome → lesson 구조화 캡처 |
-
-## 온톨로지 (v1)
-
-7개 지식 클래스와 정형화된 프론트매터 규약.
-
-| 클래스 | 용도 | page_kind |
-|--------|------|-----------|
-| **Artifact** | 코드 엔티티 (함수, 모듈, 커널) | entity, kernel, module |
-| **Concept** | 도메인 개념, 이론 | concept, theory, overview |
-| **Source** | 논문, 문서 요약 | paper, manual, spec |
-| **Procedure** | 단계별 절차 | procedure, workflow, recipe |
-| **Experience** | 시행착오 에피소드 | episode, session, incident |
-| **Heuristic** | 규칙, 교훈 | rule, guideline, pattern |
-| **Decision** | 설계 결정 + 근거 | decision, trade-off |
-
-### 스키마 진화
-
-모든 스키마 변경은 **proposal-first** 워크플로우를 따릅니다:
-
-```
-/kg-reflect (드리프트 감지)
-  → /kg-schema propose (제안 생성)
-    → /kg-schema approve (영수증 수집 + 게이트 판정)
-      → /kg-schema apply (스키마 파일 수정)
-        → /kg-schema migrate (영향 받는 페이지 마이그레이션)
+```text
+사용자             kg-skill                    Claude (세션 간)
+────────          ─────────────────           ──────────────────────
+"이 논문 인제스트" → /kg-ingest paper.pdf  →   논문 내용을 알고 기존 개념과 연결
+"왜 X였지?"        → /kg-query --depth deep → 과거 결정 + 근거 인용
+"위키 점검"        → /kg-reflect           → 보지 못한 긴장 발견
+"감사"            → /kg-lint              → 깨진 링크, stale claim, 스키마 드리프트 검출
 ```
 
-**Receipt 기반 품질 게이트**: `validate.py --receipt`가 6개 센서를 실행합니다. Required 티어(schema_diff, template_contract, frontmatter_valid, legacy_compat, evidence_pages)가 모두 PASS여야 승인이 진행됩니다.
+가능한 곳은 **결정론적**(BM25 검색, 그래프 순회, 검증 스크립트), 권한이 중요한 곳은 **인간 게이트**(스키마 변경, 페이지 삭제, 소스 승인) — 이 분리가 핵심입니다.
 
-## 설치
+---
 
-스킬 디렉토리를 `~/.claude/skills/`에 복사:
+## 5분 안에 시작하기
 
 ```bash
-cp -r kg kg-orient kg-update kg-query kg-lint kg-ingest \
-      kg-reflect kg-challenge kg-connect kg-suggest \
-      kg-init kg-schema kg-elicit kg-postmortem \
-      kg-autoresearch kg-canvas \
-      ~/.claude/skills/
+# 1. graphify 설치 (그래프 추출 백엔드)
+pip install graphifyy
+
+# 2. kg-skill을 Claude에 설치
+git clone https://github.com/gonos2k/kg-skill.git ~/kg-skill-source
+cd ~/kg-skill-source
+cp -r kg kg-* ~/.claude/skills/
+
+# 3. Claude Code에서 위키 부트스트랩
+/kg-init
+
+# 4. 논문이나 코드를 raw/에 넣고 인제스트
+/kg-ingest raw/my-paper.pdf
+
+# 5. 질문하기
+/kg-query "이 논문이 X에 대해 뭐라고 하지?"
+
+# 6. 몇 번 인제스트한 뒤 통찰 surfacing
+/kg-reflect
 ```
 
-`~/.claude/CLAUDE.md`에 추가:
+이게 전부입니다. 모든 스킬이 동일한 5공식 구조를 따르고 예측 가능한 Output Contract를 출력합니다.
 
-```markdown
-## kg (knowledge-graph)
-- **kg** (`~/.claude/skills/kg/SKILL.md`) - Knowledge graph + LLM wiki.
-  Sub-commands: /kg-orient, /kg-update, /kg-query, /kg-lint, /kg-ingest,
-  /kg-reflect, /kg-challenge, /kg-connect, /kg-suggest
-When the user types /kg or any sub-command, invoke the Skill tool with the matching skill name.
-When wiki/ or graphify-out/ exists in the project, proactively orient at session start.
+---
+
+## 5공식 표준
+
+모든 `kg-*` 스킬은 같은 구조라서 Claude의 동작이 일관됩니다:
+
+| 섹션 | 답하는 것 |
+|---|---|
+| **YAML Trigger** | 이 스킬은 언제 켜져야 하는가? (구체적 phrase, 프로젝트 상태) |
+| **Activate When / Do Not Activate When** | 명시적 양/음 트리거 — 스킬 충돌 방지 |
+| **Workflow** | "stop condition"을 포함한 단계별 절차 |
+| **Output Contract** | 표준 필드(`Confidence:`, `Caveats:`, `Next command:`)를 가진 fenced `text` 블록. [`kg/references/output-contract-standard.md`](kg/references/output-contract-standard.md) 참조 |
+| **Examples + Exceptions and Escalation** | 구체적 사용 예시 + 모든 escape hatch 차단 (예: "사용자 'yes'는 승인 아님") |
+
+권한이 중요한 곳에서 **LLM이 임의로 행동할 수 없게** 만든 설계. 어떤 `/kg-*` 명령을 켜도 같은 형식이 나옵니다.
+
+---
+
+## 슬래시 커맨드 (18개)
+
+### 데이터 운영 — 지식 축적
+
+| 커맨드 | 용도 |
+|---|---|
+| `/kg-init` | 위키 부트스트랩 (스키마, 폴더, 인덱스). 멱등(재실행 안전). |
+| `/kg-ingest` | 소스 읽기 → 핵심 토론 → source/entity/concept 페이지 작성 + [[wikilink]]. |
+| `/kg-update` | 그래프 증분 재빌드 (`graphify <path> --update` 위임). |
+| `/kg-query` | BFS/DFS 순회 + 위키 검색. `--depth quick\|standard\|deep`. |
+| `/kg-lint` | 건강 점검 — 고아 페이지, 깨진 링크, stale claim, proposal debt. |
+| `/kg-orient` | read-only 세션 시작 요약 (hot.md, 그래프 통계, 신선도). |
+
+### 대화 운영 — LLM을 사고 파트너로
+
+| 커맨드 | 용도 |
+|---|---|
+| `/kg-reflect` | 긴장, 새 패턴, 사각지대, 스키마 드리프트 surfacing. 요약이 아니라 비자명 통찰만. |
+| `/kg-challenge` | 악마의 변호인. **기존 근거만으로** 위키 주장 반박. |
+| `/kg-connect` | 그래프 커뮤니티 간 누락 다리 발견. 자동으로 엣지 추가 안 함. |
+| `/kg-suggest` | 실제 지식 갭 기반 다음 자료/액션 추천. |
+| `/kg-elicit` | 대화로 암묵지 캡처 → Experience(항상) + 선택적 Heuristic. |
+| `/kg-postmortem` | 최근 구체적 실패용 더 엄격한 `/kg-elicit` (에러 텍스트 verbatim 보존). |
+| `/kg-autoresearch` | 감독 하의 다중 라운드 웹 리서치. 명시적 사용자 승인까지 큐만 작성 — 자동 인제스트 절대 금지. |
+
+### 거버넌스 & 통합
+
+| 커맨드 | 용도 |
+|---|---|
+| `/kg-schema` | 온톨로지 진화 — `propose`, `approve`, `apply`, `migrate`, `diff`, `list`, `pull-global`. Receipt-gated. |
+| `/kg-canvas` | 위키를 Obsidian Canvas (`.canvas` JSON)로 내보내기. read-only. |
+| `/kg-merge` | **신규** — `graphify merge-graphs`로 cross-project KG (여러 repo → 통합 그래프). |
+| `/kg-mcp` | **신규** — `.mcp.json`에 `graphify --mcp` 등록 → 다른 스킬이 graph.json 재로딩 없이 MCP 도구로 그래프 쿼리. `--apply` Authority gate. |
+
+### 라우터
+
+| 커맨드 | 용도 |
+|---|---|
+| `/kg` | 라우터 — 시스템 설명 또는 적절한 sub-command로 안내. 직접 실행은 안 함. |
+
+---
+
+## 온톨로지 (v1) — 7개 클래스
+
+각 위키 페이지는 정형 frontmatter를 가진 한 클래스입니다:
+
+| 클래스 | 용도 | 폴더 |
+|---|---|---|
+| **Artifact** | 코드 엔티티 (함수, 모듈, 커널) | `wiki/entities/` |
+| **Concept** | 도메인 개념, 이론 | `wiki/concepts/` |
+| **Source** | 논문 / 문서 / URL 요약 | `wiki/sources/` |
+| **Procedure** | 단계별 절차 | `wiki/procedures/` |
+| **Experience** | 시행착오 에피소드 (verbatim 보존) | `wiki/experiences/` |
+| **Heuristic** | 정제된 rule of thumb | `wiki/heuristics/` |
+| **Decision** | 근거 있는 설계 결정 | `wiki/decisions/` |
+
+### 스키마 진화 (proposal-first)
+
+```text
+/kg-reflect (드리프트 감지)
+    → /kg-schema propose (제안 작성)
+        → /kg-schema approve (영수증 수집 + 6-sensor 게이트)
+            → /kg-schema apply (영수증 PASS인 경우만)
+                → /kg-schema migrate (영향 받는 페이지 마이그레이션)
 ```
 
-## 의존성
+**Authority Matrix** ([`kg/references/authority-matrix.md`](kg/references/authority-matrix.md))
 
-- [graphify](https://github.com/safishamsi/graphify) (`pip install graphifyy`) — 구조 그래프 추출
-- [Obsidian](https://obsidian.md/) (선택) — 위키링크와 그래프 뷰로 위키 탐색
+| 액션 | 권한 | 이유 |
+|---|---|---|
+| 스키마 변경 | **Human** | 온톨로지는 contract |
+| 페이지 재분류 / 삭제 | **Human** | 폴더 변경 = identity 변경 |
+| Source 승인 (autoresearch) | **Human** | provenance 무결성 |
+| Experience → Heuristic 승격 | **Human** | 일반화는 판단 |
+| `hot.md` / `log.md` / `_index.md` 갱신 | **LLM** | 재생성 가능한 bookkeeping |
+| `pull-global` 호환 변경 | **LLM (dry-run 우선)** | 항상 미리보기 |
+
+---
 
 ## 아키텍처
 
-```
+```text
 project/
-├── <source-dir>/            # 계층 1: 원본 소스 (불변)
-├── wiki/                    # 계층 2: LLM 유지 위키
-│   ├── .schema/             #   per-wiki 스키마 핀
-│   ├── .schema-proposals/   #   보류 중 스키마 제안
-│   ├── index.md             #   콘텐츠 카탈로그
-│   ├── hot.md               #   현재 초점 + 유지보수 부채
-│   ├── overview.md          #   프로젝트 개요
-│   ├── log.md               #   연대순 기록
-│   ├── entities/            #   Artifact 페이지
-│   ├── concepts/            #   Concept 페이지
-│   ├── sources/             #   Source 페이지
-│   ├── procedures/          #   Procedure 페이지
-│   ├── experiences/         #   Experience 페이지
-│   ├── heuristics/          #   Heuristic 페이지
-│   ├── decisions/           #   Decision 페이지
-│   └── queries/             #   쿼리 결과 캐시
-├── graphify-out/            # 구조 그래프 계층
-│   ├── graph.json           #   노드, 엣지, 커뮤니티
-│   ├── manifest.json        #   증분 갱신용 해시
-│   └── GRAPH_REPORT.md      #   갓 노드, 서프라이즈
-└── CLAUDE.md                # 스키마 규약과 워크플로우
+├── <source-dir>/             # 계층 1 — 원본 소스 (불변)
+│   └── (자동 감지: gMeso/vault/, raw/, docs/, 또는 .)
+├── wiki/                     # 계층 2 — LLM 유지 위키
+│   ├── .schema/              #   per-wiki 스키마 핀 (/kg-init이 복사)
+│   ├── .schema-proposals/    #   pending proposal + 영수증
+│   ├── .research-queue/      #   /kg-autoresearch staging (approved/rejected)
+│   ├── index.md              #   콘텐츠 카탈로그 (마지막 수단 read)
+│   ├── hot.md                #   ~500단어 세션 컨텍스트 캐시
+│   ├── overview.md           #   안정된 글로벌 synthesis
+│   ├── log.md                #   append-only 운영 history
+│   ├── entities/             #   Artifact 페이지
+│   ├── concepts/             #   Concept 페이지
+│   ├── procedures/           #   Procedure 페이지
+│   ├── experiences/          #   Experience 페이지
+│   ├── heuristics/           #   Heuristic 페이지
+│   ├── decisions/            #   Decision 페이지
+│   ├── sources/              #   Source 요약
+│   └── queries/              #   filed query 결과
+└── graphify-out/             # 구조 그래프 계층 (graphify v0.5.0+)
+    ├── graph.json            #   NetworkX node_link_data
+    ├── GRAPH_REPORT.md       #   갓 노드, 커뮤니티, surprises
+    ├── graph.html            #   대화형 HTML (default)
+    ├── manifest.json         #   증분 갱신용 SHA256 manifest
+    ├── memory/               #   Q&A 피드백 루프
+    ├── merged-graph.json     #   cross-repo merge 결과
+    └── (선택: graph.svg, graph.graphml, cypher.txt)
 ```
 
-### 네이밍 규약
+### 검증 체인
 
-- **`/kg-<verb>`** (하이픈) — canonical 사용자 커맨드. 서브스킬 `trigger:` 필드가 이 형식을 사용.
-- **`/kg <verb>`** (공백) — 가독성용 표기. 실제 호출 시 항상 하이픈 형식 사용.
+**Graph → Wiki → Raw Source**가 신뢰 위계입니다. 위키는 **derived**, 원본 소스가 **authoritative**. `/kg-query`는 결정에 영향 주는 답에는 raw source를 인용합니다.
+
+### 두 가지 운영 모드
+
+- **Graph-only**: `graphify-out/`만 존재. `/kg-orient`, `/kg-query`, `/kg-update` 단독 작동.
+- **Graph + Wiki**: 둘 다 존재. 위키가 구조 그래프 위에 의미 깊이를 더함.
+
+---
+
+## References 라이브러리
+
+`kg/references/` — Claude가 필요할 때만 읽음 (progressive disclosure):
+
+| 파일 | 주제 |
+|---|---|
+| [`architecture.md`](kg/references/architecture.md) | 레이아웃, 소스 감지, 페이지 템플릿, 기술 노트 |
+| [`ontology.md`](kg/references/ontology.md) | 7 클래스, page_kind, instance_of, schema-as-product, proposal/receipt |
+| [`authority-matrix.md`](kg/references/authority-matrix.md) | Human vs LLM 권한, hot.md 우선순위, novelty test |
+| [`context-compression.md`](kg/references/context-compression.md) | BM25 검색, hot/overview/_index 위계, archive 정책 |
+| [`schema-evolution.md`](kg/references/schema-evolution.md) | 마이그레이션 정책, supersession, convergence tracking |
+| [`codex-integration.md`](kg/references/codex-integration.md) | 양방향 Codex 파이프라인 (review filing, domain context injection) |
+| [`output-contract-standard.md`](kg/references/output-contract-standard.md) | 표준 Output Contract 필드명 — `Next command:`, `Confidence:`, `Caveats:` |
+
+---
+
+## Helper 도구
+
+`kg/schema/tools/` — 결정론적 헬퍼가 LLM 판단 부담을 줄여줍니다:
+
+| 스크립트 | 용도 |
+|---|---|
+| `validate.py` | frontmatter 검증, relation domain/range 체크, receipt 생성 |
+| `build_search_index.py` | BM25 검색 인덱스 빌더 (한국어+영어 CJK 토크나이저) |
+| `check_skill_frontmatter.py` | 모든 SKILL.md 검증 (YAML, 필수 키, trigger equality, body forbidden 패턴) |
+| `kg_lint.py` | 위키 sensor — 고아 페이지, 누락 wikilink, deprecated-without-callout, supersession 고아 |
+| `extract_claims.py` | `> [!claim]`, `> [!evidence]`, `> [!tension]` 콜아웃 → JSON (`/kg-query`, `/kg-challenge` 사용) |
+
+---
+
+## graphify 통합 (soft dependency)
+
+11개 sub-skill이 [graphify](https://github.com/safishamsi/graphify) v0.5.0+가 있으면 자동 사용, 없거나 stale이면 우아하게 fallback.
+
+**Freshness gate**: `graphify-out/graph.json`은 `mtime < 7일`일 때만 authoritative로 취급. stale 그래프는 wiki-only / BM25-only 경로로 강등되고 `Caveats:`에 stale 표기.
+
+**MCP 서버 도구** (`graphify <path> --mcp`):
+
+| 도구 | 사용처 |
+|---|---|
+| `query_graph` | `/kg-query` (token budget 있는 BFS/DFS) |
+| `get_node` / `get_neighbors` | `/kg-challenge`, `/kg-elicit` |
+| `get_community` | `/kg-connect`, `/kg-suggest` |
+| `god_nodes` | `/kg-orient`, `/kg-suggest` |
+| `graph_stats` | `/kg-orient`, `/kg-lint` |
+| `shortest_path` | `/kg-ingest` (confirmation gate), `/kg-postmortem` (패턴 감지), `/kg-connect` (객관적 거리) |
+
+`/kg-mcp register --scope project --apply`로 MCP 서버 등록.
+
+---
+
+## 설치
+
+### 요구사항
+
+- Python ≥ 3.10
+- [graphify](https://github.com/safishamsi/graphify) v0.5.0+: `pip install graphifyy`
+- [Obsidian](https://obsidian.md/) (선택, 그래프 뷰로 위키 탐색)
+
+### 스킬 설치
+
+```bash
+git clone https://github.com/gonos2k/kg-skill.git
+cd kg-skill
+cp -r kg kg-* ~/.claude/skills/
+```
+
+### `~/.claude/CLAUDE.md`에 추가
+
+```markdown
+## kg (knowledge-graph)
+- **kg** (`~/.claude/skills/kg/SKILL.md`) — Knowledge graph + LLM wiki router.
+  Sub-commands: /kg-orient, /kg-update, /kg-query, /kg-lint, /kg-ingest,
+  /kg-reflect, /kg-challenge, /kg-connect, /kg-suggest, /kg-elicit,
+  /kg-postmortem, /kg-schema, /kg-autoresearch, /kg-canvas, /kg-merge, /kg-mcp.
+When the user types /kg or any sub-command, invoke the Skill tool with the matching skill name.
+When wiki/ or graphify-out/ exists in the project, the kg-orient skill auto-suggests at session start.
+```
+
+### 설치 검증
+
+```bash
+python3 ~/.claude/skills/kg/schema/tools/check_skill_frontmatter.py
+# 예상: PASS — 18 SKILL.md files OK
+```
+
+---
+
+## 네이밍 규약
+
+- **`/kg-<verb>`** (하이픈) — canonical 사용자 커맨드. 항상 이 형식 사용.
+- **`/kg <verb>`** (공백) — 사용 안 함; 모든 sub-skill의 `trigger:` 필드는 하이픈 형식이 ground truth.
+
+---
 
 ## 상호작용 원칙
 
-1. **비대칭 역할** — 인간은 판단과 방향을 제공하고, LLM은 회상·교차 참조·패턴 감지를 담당합니다.
-2. **생산적 마찰** — 동의는 저렴합니다. 가치 있는 상호작용은 LLM이 모순, 갭, 비자명 연결을 드러낼 때 발생합니다.
-3. **대화의 축적** — reflect, challenge, connect의 통찰이 위키에 다시 기록되어 대화 자체가 축적됩니다.
-4. **스키마는 제품** — 스키마(`core.yaml` + `relations.yaml`)는 인프라가 아닌 도메인 모델 자체입니다. 모든 변경은 proposal-first.
+1. **비대칭 역할** — 인간은 판단·방향을 제공, LLM은 회상·교차 참조·패턴 감지를 담당.
+2. **생산적 마찰** — 동의는 저렴함. 가치는 LLM이 모순·갭·비자명 연결을 드러낼 때 발생.
+3. **대화의 축적** — `/kg-reflect`, `/kg-challenge`, `/kg-connect`의 통찰이 위키에 다시 기록되어 대화 자체가 축적.
+4. **스키마는 제품** — `core.yaml` + `relations.yaml`은 인프라가 아니라 도메인 모델. 모든 변경 proposal-first.
+5. **결정론 > LLM 판단** — 스크립트로 가능한 검증(BM25, 그래프 거리, frontmatter 검증)은 스크립트로. LLM 판단은 콘텐츠 질문 전용.
 
-## 도구
-
-| 파일 | 용도 |
-|------|------|
-| `kg/schema/tools/validate.py` | 프론트매터 검증, 관계 도메인/레인지 체크, receipt 생성 |
-| `kg/schema/tools/build_search_index.py` | BM25 검색 인덱스 빌드 |
-| `kg/schema/core.yaml` | 클래스 정의, 인식론적 상태, 신뢰도 레벨 |
-| `kg/schema/relations.yaml` | 술어 정의 + 도메인/레인지 제약 |
-| `kg/schema/frontmatter.yaml` | 필드 타입 + 열거형 |
-| `kg/templates/*.md` | 클래스별 페이지 템플릿 |
+---
 
 ## 라이선스
 

@@ -1,6 +1,6 @@
 ---
 name: kg-elicit
-description: Surface tacit knowledge from the user via structured dialog. Creates Experience or Heuristic pages when hidden reasons, past failures, or rules-of-thumb emerge. Triggers on keywords 실패/주의/반복된 실수/명심/비법, or invoked explicitly with /kg-elicit [topic].
+description: "This skill should be used when the user mentions tacit knowledge, repeated mistakes, gotchas, lessons learned, 비법, 주의사항, 실패 경험, or invokes /kg-elicit. Captures implicit knowledge as Experience first, optionally promotes to Heuristic only after explicit confirmation."
 trigger: /kg-elicit
 ---
 
@@ -8,11 +8,27 @@ trigger: /kg-elicit
 
 Goal: turn what's in the user's head into a wiki page before it's lost.
 
+## Activate When
+
+- User mentions tacit knowledge, repeated mistakes, gotchas, lessons learned
+- Korean keywords: `비법`, `주의사항`, `실패`, `반복된 실수`, `명심`
+- During `/kg-ingest`, after the main flow, if trigger keywords appear in source or recent conversation
+- During `/kg-reflect`, when an Experience is referenced but no page exists
+- User explicitly invokes `/kg-elicit [topic]`
+
+## Do Not Activate When
+
+- The event is concrete and recent (last session/today) → use `/kg-postmortem` (stricter template)
+- User wants to query existing experiences → `/kg-query`
+- User wants summary of tensions → `/kg-reflect`
+
 ## Preconditions
-- Wiki must be bootstrapped (`/kg init` has run, `wiki/` exists with `.schema/` and content folders)
-- If wiki doesn't exist, tell user to run `/kg init` first and stop
+
+- Wiki must be bootstrapped (`/kg-init` has run, `wiki/` exists with `.schema/` and content folders)
+- If wiki doesn't exist, tell user to run `/kg-init` first and stop
 
 ## When to run
+
 - Explicitly: user types `/kg-elicit [topic]`
 - Auto: during `/kg-ingest`, after the main flow, if trigger keywords appear in the source or recent conversation
 - Auto: during `/kg-reflect`, when an Experience is referenced but no page exists
@@ -55,9 +71,16 @@ Then write `wiki/heuristics/<slug>.md` from the heuristic template:
 
 Update `wiki/heuristics/_index.md`, `wiki/index.md`, `wiki/log.md`, and `wiki/hot.md`.
 
+## graphify integration (when available)
+
+If `graphify-out/graph.json` exists AND `mtime < 7 days`:
+- After Heuristic creation: call `get_neighbors(<related_concept>)` to verify the new Heuristic links to existing concepts (auto-suggest 1-hop wikilinks)
+- For Experience: optional `shortest_path(<symptom>, <root_cause>)` to verify the link makes structural sense
+- If graph stale (≥7d) or absent, skip this enrichment (Heuristic creation is wiki-layer; graph isn't required).
+
 ## After writing
+
 - Do NOT rebuild the graph — elicited knowledge is wiki-layer only
-- Report back: path to new page(s), one-line summary
 - Append to `wiki/log.md`:
   ```
   ## [YYYY-MM-DD] elicit | <one-line thesis>
@@ -66,7 +89,55 @@ Update `wiki/heuristics/_index.md`, `wiki/index.md`, `wiki/log.md`, and `wiki/ho
   ```
 
 ## Principles
+
 - **Don't fabricate**. If the user is vague, ask one sharpening question. If still vague, file as `epistemic_status: inferred` with `confidence: low`.
 - **No leading questions**. "What went wrong?" not "Was it X that went wrong?"
 - **One page per lesson**. Don't pack multiple heuristics into one page.
 - **Experience-first**. A single "specific or general?" gate over-files Heuristics. Routing through Experience first keeps the raw case intact and makes promotion an explicit, datable act.
+
+## Output Contract
+
+```text
+Elicit result: PASS | PARTIAL
+
+Captured:
+- Experience: [[experiences/<slug>]]
+- Heuristic: [[heuristics/<slug>]] | none (deferred or rejected)
+
+Epistemic status: observed | inferred | hypothesis
+Per-item confidence: high | medium | low (Heuristic only)
+
+One-line lesson:
+<lesson>
+
+Updated:
+- experiences/_index.md
+- heuristics/_index.md (if Heuristic created)
+- index.md
+- log.md
+- hot.md (Recent Activity)
+
+Confidence: high | medium | low
+
+Caveats:
+- <vague answers | event still unresolved | no Heuristic | graphify-stale (enrichment skipped) | none>
+
+Next command:
+- <none | /kg-reflect (if 3rd+ elicit) | /kg-challenge "<lesson>" | /kg-update>
+```
+
+## Exceptions and Escalation
+
+- **Wiki absent** → stop and suggest `/kg-init`.
+- **User vague after one sharpening question** → file as `epistemic_status: inferred`, `confidence: low`. Do not invent details.
+- **User says "maybe general"** → do NOT create Heuristic. Keep as Experience only.
+- **Multiple lessons in one input** → split into multiple Experience pages (one event = one page).
+- **Promotion to Heuristic requires explicit "yes" + phrased rule** per Authority Matrix.
+
+## Quality Gates
+
+Before final answer:
+- [ ] Experience page created (always, even if vague)
+- [ ] Heuristic only created with explicit confirmation + phrased rule
+- [ ] Indexes updated
+- [ ] log.md entry added

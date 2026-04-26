@@ -12,6 +12,20 @@ Schema has **two tiers**:
 
 Every change is an explicit, logged, reversible event. The two tiers evolve independently.
 
+## Activate When
+
+- User asks for "스키마 변경", "온톨로지 진화", "분류 체계 수정", "class 추가", "predicate 추가"
+- `/kg-reflect` surfaced a SIG-* drift signal that the user wants to formalize
+- User invokes `/kg-schema <subcommand>` (list/propose/approve/apply/migrate/diff/list/pull-global)
+- Before adopting a new content pattern that would benefit from a typed predicate
+
+## Do Not Activate When
+
+- User wants to ingest content using existing schema → `/kg-ingest`
+- User wants drift signals (not formal proposals) → `/kg-reflect`
+- User wants to lint without changing schema → `/kg-lint`
+- User wants to query existing schema-compliant pages → `/kg-query`
+
 ## Sub-commands
 
 ### `/kg-schema list [--global]`
@@ -145,8 +159,8 @@ Names match `validate.py --receipt` output keys exactly.
 **Not yet implemented in validate.py** (tracked as SKIP in receipt):
 | Sensor | Runs during | Status |
 |--------|---|---|
-| `signal_staleness` | reflect, lint | SKILL.md 규약만 (수동 검사) |
-| `proposal_debt` | reflect, lint | SKILL.md 규약만 (수동 검사) |
+| `signal_staleness` | reflect, lint | references/ontology.md 규약만 (수동 검사) |
+| `proposal_debt` | reflect, lint | references/ontology.md 규약만 (수동 검사) |
 | `migration_dry_run` | approve | 향후 구현 예정 |
 | `supersession_integrity` | lint | 향후 구현 예정 |
 | `convergence_delta` | approve | 향후 구현 예정 |
@@ -165,6 +179,117 @@ sensor_run → results
 - **Insight** (informational): `convergence_delta`, `community_bridge_impact`
 
 Missing data is `SKIP`, not `FAIL`. The gate only blocks on explicit failures.
+
+## Output Contract (per subcommand)
+
+### `list`
+```text
+Schema target: per-wiki | global
+Schema version: v<N>
+Classes: <count> (<list>)
+Predicates: <count> active, <count> deprecated
+Epistemic states: <list>
+Delta from global: <added | removed | renamed | none>
+Pending proposals: <count> (<list>)
+```
+
+### `propose`
+```text
+Proposal created: yes | no
+Proposal id: YYYY-MM-DD-<slug>
+Type: add_class | add_relation | deprecate_class | rename | add_epistemic_state
+Description: <verbatim>
+Evidence:
+- [[page-1]]
+- [[page-2]]
+Originating signal: SIG-NNN | none
+Migration plan: <one-line>
+Status: pending
+Next command: /kg-schema approve <id>
+```
+
+### `approve`
+```text
+Receipt collected: yes | no
+Gate result: PASS | FAIL | SKIP
+Required checks:
+- schema_diff:        PASS | FAIL | SKIP
+- template_contract:  PASS | FAIL | SKIP
+- frontmatter_valid:  PASS | FAIL | SKIP
+- legacy_compat:      PASS | FAIL | SKIP
+- evidence_pages:     PASS | FAIL | SKIP
+Advisory checks:
+- predicate_utilization: <%>
+Receipt file: wiki/.schema-proposals/<id>-receipt.yaml
+Proposal status: approved | rejected
+Next command: /kg-schema apply <id> | (re-run after fix)
+```
+
+### `apply`
+```text
+Apply result: PASS | REFUSED | FAIL
+Proposal id: <id>
+Receipt verified: yes | no (REFUSED if no)
+Old schema version: v<N>
+New schema version: v<N+1>
+Files changed:
+- wiki/.schema/core.yaml | relations.yaml | frontmatter.yaml
+Migration file: wiki/.schema/migrations/<N+1>-<slug>.yaml
+Next command: /kg-schema migrate --dry-run <id>
+```
+
+**Receipt-missing policy:** apply is **REFUSED** when `wiki/.schema-proposals/<id>-receipt.yaml` is absent. Reason: receipt is the evidence gate that approve uses; bypassing it via apply would absorb the human-deliberation step into an automated path, violating Authority Matrix ("Schema change = Human"). Recovery: re-run `/kg-schema approve <id>` to regenerate receipt, then retry apply.
+
+### `migrate`
+```text
+Migration mode: dry-run | apply
+Proposal id: <id>
+Affected pages: <count>
+Pages to modify: <list with action per page>
+Pages skipped: <count> (legacy carve-out | already compliant | other)
+Human review needed: <list — pages where reclassification or identity change is proposed>
+Next command: /kg-migrate apply | edit <page> manually
+```
+
+### `diff`
+```text
+Diff target: <v-old> vs <v-new> | per-wiki vs global
+Added classes: <list>
+Removed classes: <list>
+Added predicates: <list>
+Removed predicates: <list>
+Renamed: <list with old → new>
+Frontmatter field changes: <list>
+```
+
+### `pull-global`
+```text
+Pull mode: dry-run | apply
+Global version: v<N>
+Pinned version: v<M>
+Gap: <N-M>
+Compatible changes: <count> (auto-applied if --apply)
+Conflicting changes: <list — require manual reconciliation>
+Next command: /kg-schema pull-global --apply | reject | review
+```
+
+## Exceptions and Escalation
+
+- **Global mutation** → require explicit `--global` flag. Never modify global schema implicitly.
+- **Receipt missing on apply** → REFUSE. Suggest `/kg-schema approve <id>` to regenerate.
+- **Receipt FAIL** (any Required-tier check failed) → REFUSE apply. Report specific failures.
+- **Migration touches page identity or folder classification** → require user approval per affected page.
+- **Pull-global has conflicting changes** → stop; do not auto-merge. Require user reconciliation.
+- **Proposal age > 14 days without action** → flag as stale in next `/kg-lint`. Suggest reject if intent has shifted.
+- **Subcommand unrecognized** → list valid subcommands, do not guess.
+
+## Quality Gates
+
+Before final answer for `apply` or `migrate`:
+- [ ] Receipt file exists and Required tiers PASS or SKIP
+- [ ] Migration plan lists every affected page (no silent edits)
+- [ ] Human-authority changes (reclassification, deletion) are flagged separately
+- [ ] `wiki/log.md` updated with proposal_id, receipt status, action taken
 
 ## Guarantees
 - Schema only goes forward. `deprecate` marks dead but visible.
