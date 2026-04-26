@@ -51,12 +51,13 @@ Per graphify v0.5.0 `serve.py`. The MCP server is launched by the **graphify sla
    {
      "mcpServers": {
        "graphify-<project-slug>": {
-         "command": "graphify",
-         "args": ["<absolute-path-to-graph.json-or-project-root>", "--mcp"]
+         "command": "<absolute-path-to-python3.10-or-newer>",
+         "args": ["-m", "graphify.serve", "<absolute-path-to-graph.json>"]
        }
      }
    }
    ```
+   **NOTE (graphify v0.5.0)**: launch entry is the Python module `graphify.serve`, not the bare CLI. The form `graphify <path> --mcp` returns `error: unknown command '--mcp'` — `--mcp` exists only as a slash-command flag in the graphify orchestrator SKILL, NOT in the bare CLI binary. Always use `<python> -m graphify.serve <graph.json>`. The `mcp` Python package is required (`pip install 'mcp[cli]'`); verify with `<python> -c "import graphify.serve"` before writing config.
 3. **Without `--apply`**: print the proposal and STOP. Do **not** edit any file. Do **not** interpret a follow-up user "yes"/"go" as approval. The user must **re-issue the command with `--apply` explicitly added** to the same scope. This prevents an LLM-mediated escape hatch around the Authority gate.
 4. **With `--apply`**: edit `.mcp.json` (user scope = `~/.claude.json`, project scope = `<cwd>/.mcp.json`).
 5. **`--scope` is required, no default.** If the user omits `--scope`, stop and ask which scope; do not assume `project` or `user`. User-scope edits affect every Claude session, so silently defaulting either way is wrong.
