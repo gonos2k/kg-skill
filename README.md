@@ -305,6 +305,20 @@ python3 ~/.claude/skills/kg/schema/tools/check_skill_frontmatter.py
 
 ---
 
+## Real-use patterns
+
+The skill set is structured around four observations:
+
+1. **Supersession over deletion** — When new evidence overturns a prior claim, the old page is preserved with a `[SUPERSEDED]` callout linking to its replacement. Git history is not the audit trail; the wiki is.
+
+2. **Productive friction is the product** — `/kg-challenge` and `/kg-reflect` are designed to generate disagreement, not consensus. Tension callouts and evidence-cited claims keep corrections cleanly applicable.
+
+3. **Adversarial review prefers small prompts, in parallel** — External-LLM critiques are more reliable as short, single-question, parallel reviews than as long synthesis prompts. See [`kg/references/codex-integration.md`](kg/references/codex-integration.md).
+
+4. **`Caveats:` is non-negotiable** — Every Output Contract carries a `Caveats:` line. Findings that *cannot* be fixed live there; the field refuses the temptation to silently drop unfixable issues.
+
+---
+
 ## License
 
 MIT

@@ -305,6 +305,20 @@ python3 ~/.claude/skills/kg/schema/tools/check_skill_frontmatter.py
 
 ---
 
+## 실제 사용 패턴
+
+스킬 셋은 네 가지 관찰을 중심으로 설계되어 있습니다:
+
+1. **삭제 대신 supersession** — 새 근거가 기존 주장을 뒤집을 때, 옛 페이지는 권위 대체 페이지로 향하는 `[SUPERSEDED]` callout과 함께 보존됩니다. Git 이력이 아니라 위키 자체가 audit trail입니다.
+
+2. **생산적 마찰이 곧 산출물** — `/kg-challenge`와 `/kg-reflect`는 합의가 아니라 의견 충돌을 만들도록 설계되어 있습니다. Tension callout과 근거 인용 claim 덕분에 정정이 깔끔하게 적용됩니다.
+
+3. **적대적 검토는 짧은 프롬프트 × 병렬을 선호** — 외부 LLM 비판은 길게 종합한 단일 프롬프트보다 짧은·단일 질문·병렬 검토일 때 더 신뢰할 수 있습니다. [`kg/references/codex-integration.md`](kg/references/codex-integration.md) 참조.
+
+4. **`Caveats:` 는 협상 불가** — 모든 Output Contract는 `Caveats:` 줄을 포함합니다. *수정 불가능한* 발견이 사는 곳이 거기입니다 — 이 필드는 수정 불가 이슈를 조용히 빠뜨리려는 유혹을 차단합니다.
+
+---
+
 ## 라이선스
 
 MIT
