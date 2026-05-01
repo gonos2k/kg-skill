@@ -60,6 +60,22 @@ cp -r kg kg-* ~/.claude/skills/
 
 That's it. Every skill follows the same 5-formula structure (see below) and produces predictable Output Contracts.
 
+## Compatibility
+
+kg-skill releases track [graphifyy](https://pypi.org/project/graphifyy/) closely. Each kg-skill release lists the **minimum** graphifyy that ships every CLI surface it relies on:
+
+| kg-skill | Minimum `graphifyy` | New behavior gated on this version |
+|---|---|---|
+| **v0.5.7** (current) | **`graphifyy>=0.5.7`** | `.graphify_root` scan-root memo (argument-less `graphify update`); kg-update wiki back-pointer maintenance |
+| v0.5.4 – v0.5.6 | `graphifyy>=0.5.0` | Multi-corpus naming convention, MCP integration via `--mcp` slash form |
+| v0.5.0 – v0.5.3 | `graphifyy>=0.5.0` | Initial 0.5.x line |
+
+Older `graphifyy` versions still work for the kg-skill features that don't depend on the newer CLI behavior — the table above lists the floor required to unlock all features documented for that kg-skill release. To align:
+
+```bash
+pip install --upgrade 'graphifyy>=0.5.7'
+```
+
 ---
 
 ## The 5-Formula Standard
@@ -86,7 +102,7 @@ This means the LLM **cannot improvise where authority matters**. Try it: invoke 
 |---|---|
 | `/kg-init` | Bootstrap a wiki (schema, folders, indexes). Idempotent. |
 | `/kg-ingest` | Read a source, discuss takeaways, write source/entity/concept pages with [[wikilinks]]. |
-| `/kg-update` | Refresh the structural graph (delegates to `graphify <path> --update`). |
+| `/kg-update` | Refresh the structural graph (CLI: `graphify update <path>`; for doc/paper re-extract: slash form `/graphify <path> --update`). |
 | `/kg-query` | BFS/DFS traversal + wiki lookup. `--depth quick\|standard\|deep`. |
 | `/kg-lint` | Health check — orphan pages, dead links, stale claims, proposal debt. |
 | `/kg-orient` | Read-only session start summary (hot.md, graph stats, freshness). |

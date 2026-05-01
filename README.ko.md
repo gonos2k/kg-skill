@@ -60,6 +60,22 @@ cp -r kg kg-* ~/.claude/skills/
 
 이게 전부입니다. 모든 스킬이 동일한 5공식 구조를 따르고 예측 가능한 Output Contract를 출력합니다.
 
+## 호환성
+
+kg-skill 릴리스는 [graphifyy](https://pypi.org/project/graphifyy/)와 발맞춰 진행됩니다. 각 kg-skill 릴리스는 자신이 사용하는 CLI 동작이 모두 포함된 **최소 graphifyy 버전**을 명시합니다:
+
+| kg-skill | 최소 `graphifyy` | 이 버전에서 풀리는 기능 |
+|---|---|---|
+| **v0.5.7** (현재) | **`graphifyy>=0.5.7`** | `.graphify_root` 스캔 루트 메모 (인자 없는 `graphify update`); kg-update 위키 back-pointer 유지 |
+| v0.5.4 – v0.5.6 | `graphifyy>=0.5.0` | Multi-corpus 명명 규약, `--mcp` 슬래시 형식의 MCP 통합 |
+| v0.5.0 – v0.5.3 | `graphifyy>=0.5.0` | 초기 0.5.x 라인 |
+
+위 표의 "최소 버전"은 해당 kg-skill 릴리스에서 *문서화된 모든 기능*을 풀려면 필요한 floor입니다. 그보다 낮은 graphifyy로도 신규 CLI 동작에 의존하지 않는 기능은 동작합니다. 정렬:
+
+```bash
+pip install --upgrade 'graphifyy>=0.5.7'
+```
+
 ---
 
 ## 5공식 표준
@@ -86,7 +102,7 @@ cp -r kg kg-* ~/.claude/skills/
 |---|---|
 | `/kg-init` | 위키 부트스트랩 (스키마, 폴더, 인덱스). 멱등(재실행 안전). |
 | `/kg-ingest` | 소스 읽기 → 핵심 토론 → source/entity/concept 페이지 작성 + [[wikilink]]. |
-| `/kg-update` | 그래프 증분 재빌드 (`graphify <path> --update` 위임). |
+| `/kg-update` | 그래프 증분 재빌드 (CLI: `graphify update <path>` 위임. 문서/논문 재추출은 슬래시 형식 `/graphify <path> --update`). |
 | `/kg-query` | BFS/DFS 순회 + 위키 검색. `--depth quick\|standard\|deep`. |
 | `/kg-lint` | 건강 점검 — 고아 페이지, 깨진 링크, stale claim, proposal debt. |
 | `/kg-orient` | read-only 세션 시작 요약 (hot.md, 그래프 통계, 신선도). |
