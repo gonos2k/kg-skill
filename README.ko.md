@@ -109,7 +109,7 @@ graphify affected "ccpp_kind_types" --relation imports --depth 3   # 변경 전 
 
 ### stdio **및** HTTP MCP
 
-그래프를 MCP 도구(`query_graph`, `get_node`, `god_nodes`, `shortest_path`, …)로 노출 — `python -m graphify.serve <graph.json>` 또는 **`graphify-mcp`** 콘솔 스크립트(v0.8.36+). v0.8.34+는 **HTTP transport**를 추가해 팀 전체가 하나의 공유 서버를 가리킬 수 있습니다. `/kg-mcp register --apply`로 `.mcp.json`에 등록.
+그래프를 MCP 도구(`query_graph`, `get_node`, `god_nodes`, `shortest_path`, …)로 노출 — `python -m graphify.serve <graph.json>` 또는 **`graphify-mcp`** 콘솔 스크립트(v0.8.36+). v0.8.34+는 **HTTP transport**를 추가해 팀 전체가 하나의 공유 서버를 가리킬 수 있습니다. `/kg-mcp register --scope project --apply`로 `.mcp.json`에 등록(`--scope`는 필수 — `user` 또는 `project`).
 
 ### 능동적 업그레이드 안내
 

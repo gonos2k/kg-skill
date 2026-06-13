@@ -109,7 +109,7 @@ graphify affected "ccpp_kind_types" --relation imports --depth 3   # blast radiu
 
 ### MCP over stdio **and** HTTP
 
-The graph is served as MCP tools (`query_graph`, `get_node`, `god_nodes`, `shortest_path`, …) via `python -m graphify.serve <graph.json>` or the **`graphify-mcp`** console script (v0.8.36+). v0.8.34+ adds an **HTTP transport** so a whole team can point at one shared server. Register into `.mcp.json` with `/kg-mcp register --apply`.
+The graph is served as MCP tools (`query_graph`, `get_node`, `god_nodes`, `shortest_path`, …) via `python -m graphify.serve <graph.json>` or the **`graphify-mcp`** console script (v0.8.36+). v0.8.34+ adds an **HTTP transport** so a whole team can point at one shared server. Register into `.mcp.json` with `/kg-mcp register --scope project --apply` (the `--scope` is required — `user` or `project`).
 
 ### Proactive upgrade nudge
 
