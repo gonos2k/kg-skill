@@ -81,6 +81,48 @@ pip install --upgrade 'graphifyy>=0.8.24'
 
 ---
 
+## What's new in v0.8.0
+
+kg-skill **v0.8.0** retargets the graphify backend from the v0.5.x line to **v0.8.x** (`graphifyy>=0.8.24`, recommended `0.8.39`) and adds first-class support for a much wider set of corpora — most notably **Fortran**. All claims below were verified against a real graphify 0.8.39 install.
+
+### Fortran corpora (scientific / HPC code)
+
+graphify (base extraction since v0.7.2) turns **any Fortran** — numerical libraries, ODE/PDE solvers, CFD/FEM, legacy F77/90+, and earth-system models like WRF/MPAS — into a `MODULE` / `SUBROUTINE` / `FUNCTION` / `USE` / `CALL` graph, built **locally via tree-sitter AST with no LLM calls**:
+
+```bash
+graphify update ./phys                              # build the dependency graph, offline
+graphify query "module_mp_wsm6" --context use       # what a module USEs (dependency backbone)
+graphify affected "ccpp_kind_types" --relation imports --depth 3   # blast radius before a change
+```
+
+- **Extensions:** `.f .F .f90 .F90 .f95 .F95 .f03 .F03 .f08 .F08`. (`.inc` is **not** parsed as Fortran — it routes to the Pascal extractor.)
+- **Capital-`F` + cpp:** `.F` files are run through `cpp` to resolve `#ifdef`/`#define` — **best-effort, and it needs a GNU `cpp`**. On macOS the Apple-clang `cpp` fails graphify's invocation, so `.F` is parsed raw with all `#ifdef` branches kept; symlink a GNU `cpp` ahead of `/usr/bin` (see [Requirements](#requirements)).
+- **Honest caveats:** the `USE`/`defines`/`references` structure is reliable; the cross-file `CALL` graph is best-effort (callees defined in other files are dropped at dedup). Full node/edge model, the macOS workaround, and a worked example: **[`kg/references/fortran.md`](kg/references/fortran.md)**.
+
+### Reverse-impact ("blast radius") — `/kg-query` Impact mode
+
+`graphify affected "X"` walks the graph **in reverse** to show everything that transitively depends on a node before you touch it. Match the relation to how it's depended on: `--relation imports` for a module (USE), `--relation references` for a derived type (`--relation` is repeatable). Ideal for refactoring and large-scale porting (e.g. Fortran→PyTorch).
+
+### Edge-context filters — `query --context`
+
+`graphify query "X" --context use` restricts BFS traversal to a single edge kind (e.g. only `USE` dependencies, or only `calls`) for sharper structural answers.
+
+### MCP over stdio **and** HTTP
+
+The graph is served as MCP tools (`query_graph`, `get_node`, `god_nodes`, `shortest_path`, …) via `python -m graphify.serve <graph.json>` or the **`graphify-mcp`** console script (v0.8.36+). v0.8.34+ adds an **HTTP transport** so a whole team can point at one shared server. Register into `.mcp.json` with `/kg-mcp register --apply`.
+
+### Proactive upgrade nudge
+
+`/kg-orient` (session start) and `/kg-update` (before extracting) detect an old graphify with `graphify --version` and prompt you to upgrade **`0.5.x → 0.8.39`** — **blocking for Fortran corpora**, which the 0.5.x line cannot parse at all.
+
+### More exports & languages
+
+Bare-CLI `graphify export {html|callflow-html|svg|graphml|neo4j|falkordb|obsidian|wiki}`, `cluster-only --graph <file>` to re-cluster merged graphs, import-cycle detection (JS/TS/Python file imports — not Fortran `USE`), and 25+ tree-sitter languages.
+
+> **Upgrade:** `uv tool install --force graphifyy` (Fortran works out of the box — `tree-sitter-fortran` is a core dependency). Add the `[mcp]` extra (`uv tool install --force "graphifyy[mcp]"`) for the MCP server. Per-feature version floors are in the [Compatibility](#compatibility) table above.
+
+---
+
 ## The 5-Formula Standard
 
 Every `kg-*` skill is structured the same way, so Claude behaves consistently:
