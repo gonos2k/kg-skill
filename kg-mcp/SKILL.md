@@ -128,7 +128,7 @@ Caveats:
 - <stale graph | other MCP servers in same config | none>
 
 Next command:
-- /kg-mcp register --apply (after reviewing proposal)
+- /kg-mcp register --scope <user|project> --apply (after reviewing proposal; --scope required)
 - /kg-query "<question>"  (after restart, will auto-use MCP if available)
 ```
 
