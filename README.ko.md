@@ -81,6 +81,48 @@ pip install --upgrade 'graphifyy>=0.8.24'
 
 ---
 
+## v0.8.0 새로운 기능
+
+kg-skill **v0.8.0**은 graphify 백엔드를 v0.5.x 라인에서 **v0.8.x**(`graphifyy>=0.8.24`, 권장 `0.8.39`)로 전환하고, 훨씬 넓은 코퍼스 — 특히 **Fortran** — 를 1급으로 지원합니다. 아래 내용은 실제 graphify 0.8.39 설치본에서 검증했습니다.
+
+### Fortran 코퍼스 (과학계산 / HPC 코드)
+
+graphify(기본 추출은 v0.7.2부터)는 **모든 Fortran** — 수치 라이브러리, ODE/PDE 솔버, CFD/FEM, 레거시 F77/90+, WRF/MPAS 같은 지구시스템 모델 — 을 `MODULE` / `SUBROUTINE` / `FUNCTION` / `USE` / `CALL` 그래프로, **로컬 tree-sitter AST로 LLM 호출 없이** 추출합니다:
+
+```bash
+graphify update ./phys                              # 의존 그래프 빌드, 오프라인
+graphify query "module_mp_wsm6" --context use       # 모듈이 USE하는 것 (의존 백본)
+graphify affected "ccpp_kind_types" --relation imports --depth 3   # 변경 전 영향 범위
+```
+
+- **확장자:** `.f .F .f90 .F90 .f95 .F95 .f03 .F03 .f08 .F08`. (`.inc`는 Fortran으로 파싱되지 않음 — Pascal 추출기로 라우팅됨.)
+- **대문자 `.F` + cpp:** `.F` 파일은 `cpp`로 `#ifdef`/`#define`을 해소 — **best-effort이며 GNU `cpp` 필요**. macOS의 Apple-clang `cpp`는 graphify 호출에서 실패하므로 `.F`는 모든 `#ifdef` 분기가 남은 채 raw 파싱됨. GNU `cpp`를 `/usr/bin`보다 먼저 심링크하세요([요구사항](#요구사항) 참고).
+- **정직한 한계:** `USE`/`defines`/`references` 구조는 신뢰 가능; cross-file `CALL` 그래프는 best-effort(다른 파일에 정의된 callee는 dedup에서 누락). 전체 노드/엣지 모델·macOS 우회·worked example: **[`kg/references/fortran.md`](kg/references/fortran.md)**.
+
+### 역방향 영향분석 ("blast radius") — `/kg-query` Impact 모드
+
+`graphify affected "X"`는 그래프를 **역방향**으로 순회해, 어떤 노드를 건드리기 전에 그것에 전이적으로 의존하는 모든 것을 보여줍니다. 의존 방식에 맞춰 relation 지정: 모듈(USE)은 `--relation imports`, derived type은 `--relation references`(`--relation`은 반복 가능). 리팩터링·대규모 포팅(예: Fortran→PyTorch)에 이상적.
+
+### 엣지 컨텍스트 필터 — `query --context`
+
+`graphify query "X" --context use`는 BFS 순회를 한 가지 엣지 종류(예: `USE` 의존만, 또는 `calls`만)로 제한해 더 날카로운 구조 답변을 줍니다.
+
+### stdio **및** HTTP MCP
+
+그래프를 MCP 도구(`query_graph`, `get_node`, `god_nodes`, `shortest_path`, …)로 노출 — `python -m graphify.serve <graph.json>` 또는 **`graphify-mcp`** 콘솔 스크립트(v0.8.36+). v0.8.34+는 **HTTP transport**를 추가해 팀 전체가 하나의 공유 서버를 가리킬 수 있습니다. `/kg-mcp register --scope project --apply`로 `.mcp.json`에 등록(`--scope`는 필수 — `user` 또는 `project`).
+
+### 능동적 업그레이드 안내
+
+`/kg-orient`(세션 시작)와 `/kg-update`(추출 전)는 `graphify --version`으로 구버전을 감지해 **`0.5.x → 0.8.39`** 업그레이드를 안내 — **Fortran 코퍼스는 차단**(0.5.x 라인은 Fortran을 전혀 파싱 못 함).
+
+### 더 많은 export & 언어
+
+bare-CLI `graphify export {html|callflow-html|svg|graphml|neo4j|falkordb|obsidian|wiki}`, merged 그래프 재클러스터용 `cluster-only --graph <file>`, import cycle 탐지(JS/TS/Python 파일 import — Fortran `USE` 제외), 25+ tree-sitter 언어.
+
+> **업그레이드:** `uv tool install --force graphifyy` (Fortran은 바로 동작 — `tree-sitter-fortran`은 core 의존성). MCP 서버는 `[mcp]` extra(`uv tool install --force "graphifyy[mcp]"`) 추가. 기능별 버전 floor는 위 [호환성](#호환성) 표 참고.
+
+---
+
 ## 5공식 표준
 
 모든 `kg-*` 스킬은 같은 구조라서 Claude의 동작이 일관됩니다:
