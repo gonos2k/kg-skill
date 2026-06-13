@@ -57,16 +57,20 @@ NEGATIVE_CONTEXT_RE = re.compile(
 # versions before declaring a failure. v0.5.5.
 PYTHON_FALLBACK_INTERPRETERS = ["python3.12", "python3.11", "python3.10", "python3"]
 
-# Verbs we know about in graphify v0.5.0 CLI's `--help` output.
-# Sourced from graphify --help; kept in code for offline verification.
+# Verbs we know about in graphify's `--help` output (curated snapshot, v0.8.x).
+# Sourced from graphify --help; kept in code for offline verification and as a
+# floor when the installed graphify is older than the targeted version.
 GRAPHIFY_KNOWN_VERBS = {
     "install", "uninstall", "path", "explain", "clone", "merge-graphs",
     "add", "watch", "update", "cluster-only", "query", "save-result",
     "check-update", "benchmark", "hook",
+    # v0.8.x graph/code verbs (all verified real in graphifyy 0.8.39)
+    "extract", "affected", "label", "tree", "export", "diagnose",
+    "provider", "prs", "merge-chunks", "global", "merge-driver",
     # Per-platform installers
     "gemini", "cursor", "claude", "codex", "opencode", "aider", "copilot",
     "vscode", "claw", "droid", "trae", "trae-cn", "antigravity", "hermes",
-    "kiro",
+    "kiro", "codebuddy", "kilo", "amp", "pi", "devin",
 }
 
 # Forms that LOOK like CLI but are intentional slash-command notation.
@@ -102,7 +106,11 @@ def graphify_help_verbs() -> set[str]:
         # Lines like "  update <path>           re-extract code files..."
         live_verbs = set(re.findall(r"^\s{2}([a-z-]+)\b", text, re.MULTILINE))
         if live_verbs:
-            return live_verbs
+            # Union with the curated snapshot: the installed graphify may be
+            # OLDER than the version kg-skill targets (e.g. 0.5.7 lacks
+            # `affected`/`extract`/`label`), so a live-only set would flag valid
+            # v0.8.x verbs. Union also tolerates a NEWER install adding verbs.
+            return live_verbs | GRAPHIFY_KNOWN_VERBS
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
     return GRAPHIFY_KNOWN_VERBS
@@ -176,8 +184,12 @@ def check_command(cmd: str, known_verbs: set[str], context: str = "") -> tuple[s
         if first_token in SLASH_ONLY_FLAGS:
             return "FAIL", f"slash-only flag {first_token!r} used in Bash position (use `/graphify ... {first_token}` instead)"
 
-        # Any token starting with `--` in first position is a bug
-        if first_token.startswith("--") and first_token != "--help":
+        # Global flags valid without a subcommand (real graphify CLI flags)
+        if first_token in ("--help", "--version"):
+            return "OK", f"global flag {first_token!r}"
+
+        # Any other token starting with `--` in first position is a bug
+        if first_token.startswith("--"):
             return "FAIL", f"flag {first_token!r} used as subcommand (graphify CLI requires <verb> first)"
 
         # Path-form (`graphify <path>` no subcommand) — typically a documentation

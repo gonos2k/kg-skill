@@ -6,7 +6,7 @@
 
 프로젝트마다 **영속적·축적형 지식 베이스**를 만듭니다. LLM은 구조화된 위키를 큐레이션하고, [Graphify](https://github.com/safishamsi/graphify)는 구조 그래프를 추출하며, **5공식 표준을 따르는 18개의 결정론적 슬래시 커맨드**가 두 계층을 동기화합니다.
 
-[Andrej Karpathy의 LLM Wiki 패턴](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)에서 출발해 7-class 온톨로지, proposal-first 스키마 진화, receipt 기반 품질 게이트, graphify v0.5.0+ MCP 통합으로 확장.
+[Andrej Karpathy의 LLM Wiki 패턴](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)에서 출발해 7-class 온톨로지, proposal-first 스키마 진화, receipt 기반 품질 게이트, graphify v0.8.x 통합(25+개 언어 tree-sitter 구조 추출 — 과학계산/HPC 코드용 **Fortran** 포함(예: WRF), 역방향 영향분석 `affected`, stdio MCP — HTTP transport는 `0.8.34+`)으로 확장.
 
 ---
 
@@ -37,8 +37,8 @@
 ## 5분 안에 시작하기
 
 ```bash
-# 1. graphify 설치 (그래프 추출 백엔드)
-pip install graphifyy
+# 1. graphify 설치 (그래프 추출 백엔드) — Fortran(예: WRF)은 v0.8.24+ 필요
+uv tool install graphifyy          # 또는: pip install 'graphifyy>=0.8.24'
 
 # 2. kg-skill을 Claude에 설치
 git clone https://github.com/gonos2k/kg-skill.git ~/kg-skill-source
@@ -66,14 +66,17 @@ kg-skill 릴리스는 [graphifyy](https://pypi.org/project/graphifyy/)와 발맞
 
 | kg-skill | 최소 `graphifyy` | 이 버전에서 풀리는 기능 |
 |---|---|---|
-| **v0.5.7** (현재) | **`graphifyy>=0.5.7`** | `.graphify_root` 스캔 루트 메모 (인자 없는 `graphify update`); kg-update 위키 back-pointer 유지 |
-| v0.5.4 – v0.5.6 | `graphifyy>=0.5.0` | Multi-corpus 명명 규약, `--mcp` 슬래시 형식의 MCP 통합 |
+| **v0.8.0** (현재) | **`graphifyy>=0.8.24`** (권장 `0.8.39`) | **Fortran type-reference 엣지**(기본 Fortran 추출 — `.f`/`.F`/`.f90`, `MODULE`/`SUBROUTINE`/`USE`/`CALL` — 은 `0.7.2`부터; `.F` cpp 전처리는 GNU-cpp 호스트에서만 best-effort); 역방향 영향분석 `affected`; `query --context` 엣지 필터; stdio MCP(HTTP transport는 `>=0.8.34`, `graphify-mcp` 콘솔 스크립트는 `>=0.8.36`); `cluster-only --graph <file>` 직접 지원(merged-graph 재클러스터); import cycle 탐지(JS/TS/Python — Fortran USE 제외); 결정론적 출력(버전별 AST 캐시는 `>=0.8.38`) |
+| v0.5.7 | `graphifyy>=0.5.7` | `.graphify_root` 스캔 루트 메모 (인자 없는 `graphify update`); kg-update 위키 back-pointer 유지 |
+| v0.5.4 – v0.5.6 | `graphifyy>=0.5.0` | Multi-corpus 명명 규약; 오케스트레이터 `--mcp` 슬래시 형식의 MCP 통합(서버 자체는 `python -m graphify.serve`이며 `--mcp`는 bare CLI 동사가 아님) |
 | v0.5.0 – v0.5.3 | `graphifyy>=0.5.0` | 초기 0.5.x 라인 |
 
-위 표의 "최소 버전"은 해당 kg-skill 릴리스에서 *문서화된 모든 기능*을 풀려면 필요한 floor입니다. 그보다 낮은 graphifyy로도 신규 CLI 동작에 의존하지 않는 기능은 동작합니다. 정렬:
+위 표의 "최소 버전"은 해당 kg-skill 릴리스에서 *문서화된 모든 기능*을 풀려면 필요한 floor입니다. 그보다 낮은 graphifyy로도 신규 CLI 동작에 의존하지 않는 기능은 동작합니다. **기본 Fortran 추출은 `graphifyy>=0.7.2`부터** 동작하며, 이 릴리스는 Fortran type-reference 엣지를 위해 `>=0.8.24`를 타겟합니다(v0.5.x 라인은 Fortran 지원이 전혀 없음). 대문자 `.F` cpp 전처리는 추가로 PATH에 **GNU `cpp`**가 필요합니다(macOS Apple-clang `cpp`는 동작하지 않음 — [`fortran.md`](kg/references/fortran.md) 참고). 정렬:
 
 ```bash
-pip install --upgrade 'graphifyy>=0.5.7'
+uv tool install graphifyy          # 권장 (격리 venv, `graphify`를 PATH에 설치); MCP 서버는 extra 필요: uv tool install "graphifyy[mcp]"
+# pip을 꼭 써야 한다면 (macOS/Windows에선 env-mismatch ModuleNotFoundError 위험으로 비권장):
+pip install --upgrade 'graphifyy>=0.8.24'
 ```
 
 ---
@@ -126,7 +129,7 @@ pip install --upgrade 'graphifyy>=0.5.7'
 | `/kg-schema` | 온톨로지 진화 — `propose`, `approve`, `apply`, `migrate`, `diff`, `list`, `pull-global`. Receipt-gated. |
 | `/kg-canvas` | 위키를 Obsidian Canvas (`.canvas` JSON)로 내보내기. read-only. |
 | `/kg-merge` | **신규** — `graphify merge-graphs`로 cross-project KG (여러 repo → 통합 그래프). |
-| `/kg-mcp` | **신규** — `.mcp.json`에 `graphify --mcp` 등록 → 다른 스킬이 graph.json 재로딩 없이 MCP 도구로 그래프 쿼리. `--apply` Authority gate. |
+| `/kg-mcp` | **신규** — `.mcp.json`에 graphify MCP 서버(`python -m graphify.serve`) 등록 → 다른 스킬이 graph.json 재로딩 없이 MCP 도구로 그래프 쿼리. `--apply` Authority gate. |
 
 ### 라우터
 
@@ -195,14 +198,14 @@ project/
 │   ├── decisions/            #   Decision 페이지
 │   ├── sources/              #   Source 요약
 │   └── queries/              #   filed query 결과
-└── graphify-out/             # 구조 그래프 계층 (graphify v0.5.0+)
+└── graphify-out/             # 구조 그래프 계층 (graphify v0.8.x)
     ├── graph.json            #   NetworkX node_link_data
-    ├── GRAPH_REPORT.md       #   갓 노드, 커뮤니티, surprises
+    ├── GRAPH_REPORT.md       #   갓 노드, 커뮤니티, surprises, import cycle
     ├── graph.html            #   대화형 HTML (default)
-    ├── manifest.json         #   증분 갱신용 SHA256 manifest
+    ├── manifest.json         #   증분 갱신용 SHA256 manifest (portable)
     ├── memory/               #   Q&A 피드백 루프
     ├── merged-graph.json     #   cross-repo merge 결과
-    └── (선택: graph.svg, graph.graphml, cypher.txt)
+    └── (선택: graph.svg, graph.graphml, cypher.txt, <project>-callflow.html, GRAPH_TREE.html)
 ```
 
 ### 검증 체인
@@ -222,7 +225,8 @@ project/
 
 | 파일 | 주제 |
 |---|---|
-| [`architecture.md`](kg/references/architecture.md) | 레이아웃, 소스 감지, 페이지 템플릿, 기술 노트 |
+| [`architecture.md`](kg/references/architecture.md) | 레이아웃, 소스 감지, 페이지 템플릿, graphify v0.8.x CLI/MCP 표면 |
+| [`fortran.md`](kg/references/fortran.md) | Fortran 코퍼스 (과학계산/HPC 코드, WRF 포함) — `.F`/`.f90` 추출, cpp 단계, 노드/엣지 모델, USE/CALL 워크플로우 |
 | [`ontology.md`](kg/references/ontology.md) | 7 클래스, page_kind, instance_of, schema-as-product, proposal/receipt |
 | [`authority-matrix.md`](kg/references/authority-matrix.md) | Human vs LLM 권한, hot.md 우선순위, novelty test |
 | [`context-compression.md`](kg/references/context-compression.md) | BM25 검색, hot/overview/_index 위계, archive 정책 |
@@ -248,11 +252,13 @@ project/
 
 ## graphify 통합 (soft dependency)
 
-11개 sub-skill이 [graphify](https://github.com/safishamsi/graphify) v0.5.0+가 있으면 자동 사용, 없거나 stale이면 우아하게 fallback.
+11개 sub-skill이 [graphify](https://github.com/safishamsi/graphify) v0.8.x가 있으면 자동 사용, 없거나 stale이면 우아하게 fallback.
 
 **Freshness gate**: `graphify-out/graph.json`은 `mtime < 7일`일 때만 authoritative로 취급. stale 그래프는 wiki-only / BM25-only 경로로 강등되고 `Caveats:`에 stale 표기.
 
-**MCP 서버 도구** (`graphify <path> --mcp`):
+**Fortran** (과학계산/HPC 코드 — 수치 라이브러리·솔버·레거시·지구시스템 모델 WRF 포함): graphify는 Fortran(`.f .F .f90 .F90 …`; 기본 추출 `0.7.2`부터, type-reference 엣지 `0.8.24`부터; **`.inc`는 Fortran 아님** — Pascal 추출기로 라우팅)을 로컬 tree-sitter AST로 `MODULE`/`SUBROUTINE`/`USE`/`CALL` 그래프로 추출(`graphify update`는 LLM 호출 없음 — community naming과 시맨틱 추출은 별도 LLM 단계). 대문자 `.F` cpp 전처리는 best-effort이며 GNU `cpp` 필요(macOS Apple-clang에서는 no-op — `.F`가 raw로 파싱됨). [`kg/references/fortran.md`](kg/references/fortran.md)와 `/kg-query` Impact 모드(`graphify affected "X"`) 참고.
+
+**MCP 서버 도구** (`python -m graphify.serve <graph.json>` 또는 `graphify-mcp`; stdio 또는 `--transport http`):
 
 | 도구 | 사용처 |
 |---|---|
@@ -272,7 +278,8 @@ project/
 ### 요구사항
 
 - Python ≥ 3.10
-- [graphify](https://github.com/safishamsi/graphify) v0.5.0+: `pip install graphifyy`
+- [graphify](https://github.com/safishamsi/graphify) v0.8.24+ (권장 `0.8.39`): `uv tool install graphifyy` (권장) 또는 `pip install 'graphifyy>=0.8.24'`
+- PATH에 **GNU** `cpp` (Fortran 대문자 `.F` 전처리에만 필요 — graphify는 bare 이름 `cpp`를 호출하며 macOS Apple-clang `cpp`는 동작하지 않아 `.F`가 raw로 파싱됨). `brew install gcc`만으로는 부족(버전별 `cpp-N`, 예: `cpp-15`만 설치됨); `cpp`라는 *이름*의 바이너리가 `/usr/bin`보다 먼저 GNU cpp를 가리키게 해야 함: `mkdir -p ~/.local/bin && ln -sf "$(ls -1 "$(brew --prefix gcc)"/bin/cpp-* | sort -V | tail -1)" ~/.local/bin/cpp` 후 `~/.local/bin`을 PATH 앞에 두고 `python -c "import shutil;print(shutil.which('cpp'))"`로 확인
 - [Obsidian](https://obsidian.md/) (선택, 그래프 뷰로 위키 탐색)
 
 ### 스킬 설치
