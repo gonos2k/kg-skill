@@ -87,6 +87,7 @@ When checking schema proposals, verify each `approved` proposal has a matching `
 If `graphify-out/graph.json` exists AND `mtime < 7 days`:
 - Call `graph_stats` MCP tool (or read GRAPH_REPORT.md) to validate node/edge counts match expected
 - Call `get_neighbors` for each wiki page mentioned in dead-link findings to cross-validate (page may be missing from wiki but exist as graph node — different problem class)
+- **Import cycles** (graphify v0.8.24+): read the `## Import Cycles` section of `GRAPH_REPORT.md` (or call `find_import_cycles` in `analyze.py`). Circular dependencies are a structural smell worth surfacing as a WARN-tier finding. **Scope caveat:** in v0.8.39 `find_import_cycles` only considers `imports_from`/`re_exports` edges, so it covers JS/TS/Python file-level import cycles — but **Fortran `USE` uses relation `imports` (context `use`), so circular Fortran `USE` chains are NOT surfaced**. Do not rely on import-cycle detection for Fortran corpora; detect those manually if needed.
 - Note in Caveats if graph stale (≥7d) — fall back to wiki-only checks
 
 ## Output Contract
@@ -99,6 +100,7 @@ Graph checks:
 - GRAPH_REPORT.md: PASS | FAIL
 - manifest.json: PASS | FAIL
 - Freshness: FRESH | STALE (<N days since rebuild>)
+- Import cycles: <N> (<sample chain>) | none | n/a (report absent)
 
 Wiki checks (if wiki/):
 - Orphan pages: <N> ([[<sample>]], ...)

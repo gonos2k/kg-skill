@@ -80,6 +80,20 @@ Each mode has a soft budget. If exceeded before synthesis:
 
 **Codex handoff**: Query results can be injected into Codex prompts as `<domain_context>` when the follow-up is a Codex review/rescue task. Selection: matched heuristics (`confidence: high`), related decisions (`decided_for`), hot.md tensions. Cap ~500 tokens. See `~/.claude/skills/kg/references/codex-integration.md`.
 
+## Structural sub-queries (graphify CLI, when `graphify-out/` fresh)
+
+For relationship/impact questions the bare graphify CLI answers from `graph.json` at **0 LLM tokens** — prefer it over loading the graph into context:
+
+| Question shape | Command |
+|---|---|
+| "What connects A to B?" / topic neighborhood | `graphify query "<q>" --budget N` (BFS; `--dfs` for depth-first) |
+| "…but only along USE / import / calls edges" | `graphify query "<q>" --context use` (repeatable edge-context filter) |
+| "Shortest link between X and Y" | `graphify path "X" "Y"` |
+| "Explain this node" | `graphify explain "X"` |
+| **Impact / blast radius** — "what breaks if I change X?" | `graphify affected "X" --relation R --depth N` (reverse traversal) |
+
+**Impact mode** is the v0.8.x addition most useful for refactoring and large-scale porting/modernization (e.g. Fortran→PyTorch): `graphify affected "<symbol>" --relation imports --depth 3` returns everything transitively depending on a node before you touch it. Match `--relation` to how the symbol is depended on — for a Fortran module use `imports` (USE), for a derived **type** use `references` (`--relation` is repeatable: `--relation imports --relation references` covers both); the wrong relation silently returns an empty set. Cite the returned nodes as `Evidence read → graph traversal`. For Fortran specifics (USE-only filters, partial CALL coverage) see `~/.claude/skills/kg/references/fortran.md`. (A dedicated `/kg-impact` split is intentionally avoided — impact is a query; this mode lives here.)
+
 ## Output Contract
 
 Always return:

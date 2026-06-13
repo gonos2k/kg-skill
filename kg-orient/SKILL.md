@@ -47,9 +47,14 @@ If reflect_debt >= 3, append: "Reflect 권장 — `/kg-reflect` 실행을 고려
 
 ## graphify integration (when available)
 
+**Version check first** (so a stale install is upgraded, not silently under-used): if `graphify` is on PATH, run `graphify --version`. If it errors with `unknown command '--version'` (a pre-0.8 / 0.5.x install) or prints a version `< 0.8.24`, surface the upgrade nudge in the orientation output:
+> ⚠ graphify `<ver | "pre-0.8">` detected — kg's v0.8.x features (Fortran extraction, `affected`, `query --context`, `cluster-only --graph`, HTTP MCP, import cycles) need `graphifyy>=0.8.24` (rec. `0.8.39`). Upgrade: `uv tool install --force graphifyy` (or `pip install -U 'graphifyy>=0.8.24'`), then restart.
+
+See `~/.claude/skills/kg/references/architecture.md` (Version detection & upgrade nudge). This is read-only orientation — never auto-upgrade; just inform.
+
 If `graphify-out/graph.json` exists AND `mtime < 7 days` (freshness gate per `~/.claude/skills/kg/references/architecture.md`):
-- **MCP path** (preferred): if `/kg-mcp` has registered the graphify MCP server in `.mcp.json`, the 7 graph tools (`god_nodes`, `graph_stats`, `query_graph`, `get_node`, `get_neighbors`, `get_community`, `shortest_path`) are exposed natively to Claude Code. Call `god_nodes(top_n=5)` + `graph_stats` for richer orientation than reading GRAPH_REPORT.md alone. To launch the MCP server in this session if not yet registered, invoke the slash command `/graphify <path> --mcp` (the graphify SKILL orchestrator starts a stdio MCP server). Note: `--mcp` is a slash-command-only flag; the bare CLI `graphify --mcp` returns `unknown command`.
-- **CLI fallback** (no MCP): only `graphify path "A" "B"` (shortest_path equivalent) is exposed. `god_nodes` / `graph_stats` are MCP-only — read GRAPH_REPORT.md instead.
+- **MCP path** (preferred): if `/kg-mcp` has registered the graphify MCP server in `.mcp.json`, the 7 graph tools (`god_nodes`, `graph_stats`, `query_graph`, `get_node`, `get_neighbors`, `get_community`, `shortest_path`) are exposed natively to Claude Code. Call `god_nodes(top_n=5)` + `graph_stats` for richer orientation than reading GRAPH_REPORT.md alone. The MCP server is the Python module `python -m graphify.serve <graph.json>` (register via `/kg-mcp register --apply`, then restart the session to load it); `--mcp` is **not** a bare CLI verb.
+- **CLI fallback** (no MCP): the bare CLI exposes `graphify path "A" "B"` (shortest_path equiv) plus `query` / `affected` / `explain` for ad-hoc traversal. `god_nodes` / `graph_stats` are MCP-only — read GRAPH_REPORT.md instead.
 - If graph stale (≥7d) or absent, fall back to GRAPH_REPORT.md only and note in Caveats.
 
 ## Source directory detection (checked in order)
@@ -73,6 +78,7 @@ Graph (if present):
 - Communities: <K>
 - Top god nodes: [<top 3-5>]
 - Freshness: FRESH | STALE (<N files changed since last build>)
+- graphify version: <X.Y.Z | pre-0.8> (⚠ upgrade nudge if < 0.8.24 — see graphify integration)
 
 Wiki (if present):
 - Pages: <N> (E entities, C concepts, P procedures, X experiences, H heuristics, D decisions, S sources)

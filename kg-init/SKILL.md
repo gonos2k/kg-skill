@@ -120,7 +120,9 @@ This is the single source of "wiki is ready to use v1". Every other kg skill tha
    ```bash
    graphify install --platform claude
    ```
-   This adds `~/.claude/skills/graphify/SKILL.md` so `/kg-update` and other skills can soft-depend on graphify v0.5.0+ tools.
+   This adds `~/.claude/skills/graphify/SKILL.md` so `/kg-update` and other skills can soft-depend on graphify v0.8.x tools. Prefer `uv tool install graphifyy` to put `graphify` on PATH first.
+
+   Note: graphify's own `/graphify <path> --wiki` produces an *agent-crawlable* markdown wiki straight from the graph — useful as raw scaffolding/stubs, but it is **not** kg's ontology-structured wiki (no 7-class frontmatter, no schema pin). kg-init owns the ontology wiki; treat a `--wiki` export as another source to `/kg-ingest`, not a substitute for this bootstrap.
 
 ## Idempotency contract
 - Running `/kg-init` twice MUST NOT:

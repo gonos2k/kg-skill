@@ -1,12 +1,12 @@
 ---
 name: kg-update
-description: "This skill should be used when source files changed and the user asks to rebuild, refresh, or update the structural graph, says '그래프 갱신', 'Graphify 업데이트', 'changed files 반영', or invokes /kg-update. Delegates to graphify update; writes graphify-out/, wiki/graph-report*.md (single-corpus or INDEX + per-corpus), and v0.5.7+ also maintains wiki/index.md Graph snapshot section + wiki/log.md audit entry. Never modifies schema or content wiki pages."
+description: "This skill should be used when source files changed and the user asks to rebuild, refresh, or update the structural graph, says '그래프 갱신', 'Graphify 업데이트', 'changed files 반영', or invokes /kg-update. Delegates to graphify update; writes graphify-out/ and wiki/graph-report*.md, and maintains the wiki/index.md Graph snapshot section + wiki/log.md audit entry. Never modifies schema or content wiki pages."
 trigger: /kg-update
 ---
 
 # /kg-update — Incremental Graph Rebuild
 
-Rebuild the structural graph without re-ingesting into wiki. Delegates to Graphify v0.5.0+.
+Rebuild the structural graph without re-ingesting into wiki. Delegates to Graphify v0.8.x (`graphify update`; AST-only, no LLM).
 
 ## Activate When
 
@@ -25,6 +25,7 @@ Rebuild the structural graph without re-ingesting into wiki. Delegates to Graphi
 
 ## Flow
 
+0. **Version gate** (run before extracting): `graphify --version`. v0.8.x prints `graphify X.Y.Z`; a pre-0.8 / 0.5.x install errors with `unknown command '--version'`. If it errors or the version is `< 0.8.24`, emit the upgrade nudge (see `~/.claude/skills/kg/references/architecture.md` Version detection & upgrade nudge): `uv tool install --force graphifyy` (or `pip install -U 'graphifyy>=0.8.24'`), then restart. **For a Fortran corpus this is blocking** — the 0.5.x line cannot parse Fortran at all (`.f`/`.F` are treated as opaque blobs), so stop and require the upgrade rather than producing an empty/garbage graph. For non-Fortran corpora, an old graphify still works for basic builds — proceed but keep the nudge in Caveats.
 1. Detect source directory:
    - **Preferred (graphify v0.5.7+)**: if `graphify-out/.graphify_root` exists, use the path it contains — graphify CLI saved this on the previous run, and the same value is what `graphify update` (no args) would use.
    - **Fallback**: probe `gMeso/vault/` > `raw/` > `docs/` > `.` in order.
@@ -125,9 +126,13 @@ Two distinct invocation surfaces with different capabilities — do not conflate
 | `/graphify <path> --update` (slash, Claude Code orchestrator) | Re-extract code + docs + papers + images via subagents | LLM tokens |
 | `/graphify <path>` (slash, no flag) | First-time build / semantic extraction on any corpus | LLM tokens |
 
-The `--update / --mode deep / --directed / --svg / --graphml / --neo4j / --mcp / --wiki / --watch / --html` flags exist only in the **slash form** (the graphify SKILL orchestrator implements them via library calls + subagents). They are NOT raw CLI flags in graphify v0.5.0 — invoking `graphify <path> --<flag>` from Bash returns `error: unknown command '<path>'`.
+In v0.8.x the bare CLI grew well beyond `update`: `extract <path> --mode deep` (semantic build), `cluster-only`, `label`, `query --context`, `affected`, `path`, `explain`, `export <format>` (`callflow-html|svg|graphml|wiki|obsidian|neo4j|falkordb|html` — all bare-CLI callable, offline; `svg` needs matplotlib), and `tree` are all Bash-callable subcommands (see `~/.claude/skills/kg/references/architecture.md` Bare CLI surface). kg-update still delegates only the **`update`** subcommand (code-only, no LLM). Note: the `/graphify <path> --wiki|--svg|--graphml|--neo4j|--obsidian|--falkordb` flag spellings are just the orchestrator shorthand for those same `export` subcommands; only `--mcp` has no bare export verb (it's the `python -m graphify.serve` server). Doc/paper/image re-extraction (which costs LLM tokens) remains the `/graphify <path> --update` slash-orchestrator path — route that via `/graphify`, not the `update` CLI.
 
-**Technical:** Manifest at `graphify-out/manifest.json`. Graph at `graphify-out/graph.json` (NetworkX node_link_data format, `links` key not `edges`). Scan-root memo at `graphify-out/.graphify_root` (v0.5.7+) — written by the CLI on every run, used by argument-less `graphify update`.
+**Technical:** Manifest at `graphify-out/manifest.json` (portable since v0.8.x — relative keys re-anchored on load). Graph at `graphify-out/graph.json` (NetworkX node_link_data format, `links` key; some raw extractions use `edges` — graphify's own `query`/`affected` handle both). Scan-root memo at `graphify-out/.graphify_root` — written by the CLI on every run, used by argument-less `graphify update`. v0.8.x bonuses: graph output is byte-deterministic across runs (stable diffs), and the AST cache is namespaced by graphify version (`cache/ast/v<version>/`, e.g. `cache/ast/v0.8.39/`) so an upgrade never serves stale extraction. After a refactor that **deletes** code, pass `graphify update <path> --force` so a smaller node count is accepted (the anti-shrink guard otherwise refuses).
+
+## Fortran corpora (scientific / HPC code)
+
+graphify extracts **any** Fortran (`.f .F .f90 .F90 .f95 .F95 .f03 .F03 .f08 .F08`; **`.inc` is NOT recognized as Fortran** — it routes to the Pascal extractor) via local tree-sitter AST — numerical libraries, solvers, simulation/HPC, legacy Fortran, and earth-system models (WRF/MPAS) alike. Base extraction landed in graphify v0.7.2; v0.8.24 added type-reference edges (target `>=0.8.24` for the full model). `graphify update <src-dir>` bootstraps a `MODULE`/`SUBROUTINE`/`USE`/`CALL` graph with no LLM tokens (code is AST-only for both `update` and `extract`; the only LLM touchpoints are community *naming* and `--mode deep`/non-code files — see `~/.claude/skills/kg/references/fortran.md` § Offline vs LLM). Capital-F files (`.F`) are passed to `cpp` first (best-effort) so `#ifdef`/`#define` macros *can* resolve — but only on a **GNU-cpp host**; on macOS/Apple-clang the invocation fails (rc=1) and `.F` is parsed raw with all `#ifdef` branches present. Lower-case `.f90` is parsed as-is. Emit `Mode: cli-bootstrap`/`cli-update` as usual. Caveat to surface: the Fortran `calls` edge is **partial across files** — every CALL form (positional, keyword-arg, continuation) is parsed, but an edge survives only for same-file callees; cross-file/`USE`-imported and external callees are dropped at dedup. The `USE`/`defines` backbone is reliable. Full model + workflow + caveats: `~/.claude/skills/kg/references/fortran.md`.
 
 **Phase Lock relation**: `kg-update` operates outside the schema Phase Lock (Draft→Approve→Apply→Migrate→Validate). It writes:
 
@@ -173,7 +178,7 @@ Files NOT touched (per Phase Lock — ontology only):
 Confidence: high | medium | low
 
 Caveats:
-- <graphify CLI missing | graph absent (bootstrap needed) | no code files (CLI no-op) | source dir empty | manifest corrupt | none>
+- <graphify CLI missing | graphify too old (<0.8.24 — upgrade nudge; blocking for Fortran) | graph absent (bootstrap needed) | no code files (CLI no-op) | source dir empty | manifest corrupt | none>
 
 Next command:
 - <none | /kg-orient | /kg-lint | /kg-reflect | /graphify <path> (bootstrap) | /graphify <path> --update (slash, doc/paper re-extract)>
@@ -181,7 +186,8 @@ Next command:
 
 ## Exceptions and Escalation
 
-- **Graphify CLI not found** (`which graphify` empty) → suggest `pip install graphifyy` and stop.
+- **Graphify CLI not found** (`which graphify` empty) → suggest `uv tool install graphifyy` (recommended; `pip install graphifyy` works but is discouraged on macOS/Windows) and stop. For Fortran corpora require `graphifyy>=0.8.24`; a system `cpp` is **not** needed for extraction (it falls back to raw bytes). A GNU `cpp` only optionally aids capital-`.F` `#ifdef` resolution — and macOS Apple-clang `cpp` does not work for it (see `~/.claude/skills/kg/references/fortran.md`).
+- **Graphify too old** (`graphify --version` errors with `unknown command '--version'`, i.e. pre-0.8 / 0.5.x, or version `< 0.8.24`) → emit the upgrade nudge (`uv tool install --force graphifyy` / `pip install -U 'graphifyy>=0.8.24'`, then restart). **Blocking for a Fortran corpus** — 0.5.x cannot parse Fortran, so stop rather than emit an empty graph; for non-Fortran corpora proceed and note it in Caveats.
 - **Source directory does not exist** → report all 5 detection candidates checked; ask user to specify path explicitly.
 - **Graph absent + non-code corpus only** — if `graphify-out/graph.json` does NOT exist AND the corpus has no code files (only docs/papers/HTML), CLI `update` outputs "Nothing to update" + "[graphify watch] No code files found". Stop, set `Update result: PARTIAL`, `Mode: slash-bootstrap`, and recommend `Next command: /graphify <path>` (slash-command orchestrator does semantic extraction via subagents). Do not retry CLI.
 - **Graph absent + code present** — `graphify update <path>` **does** bootstrap from scratch via AST extraction (verified empirically on graphify v0.5.0; e.g., 33 .py files → 427 nodes, 21 communities, no LLM). This is the "happy path" for code-only first-time runs. Emit `Mode: cli-bootstrap`.
@@ -190,7 +196,7 @@ Next command:
 - **Never modify** `wiki/.schema/`, `wiki/.schema-proposals/`, or content wiki pages (`entities/`, `concepts/`, `sources/`, `decisions/`, `heuristics/`, `experiences/`, `procedures/`, `queries/`). This skill is graph-layer + derived-navigation only.
 - **`wiki/index.md` outside `## Graph snapshot`** is off-limits. If you need to touch other sections, that's a content-layer change → `/kg-ingest` or manual edit.
 - **`wiki/log.md` insertion** is append-only. Never rewrite or reorder existing entries.
-- **`--watch` / `--mode deep` / `--directed` / `--cluster-only` / `--svg` / `--graphml` / `--neo4j` / `--mcp` / `--wiki` modes** → these are slash-command orchestrator features only (not raw CLI). Suggest `/graphify <path> --<flag>` and stop; this skill delegates only the CLI `update` subcommand.
+- **Re-clustering / granularity / exports** → `cluster-only` (incl. the bare CLI `graphify cluster-only <path> --resolution N` for finer communities and `--exclude-hubs N` to suppress utility super-hubs from god-node rankings), `label`, `affected`, `query`, `export <format>` (all formats bare-CLI), and `tree` are real v0.8.x CLI subcommands, but they are **out of kg-update's scope** — kg-update delegates only `update`. Route re-clustering to a direct `graphify cluster-only` call or `/kg-reflect`; route impact/queries to `/kg-query`. (The `--wiki / --svg / --graphml / --neo4j / --obsidian / --falkordb` flag spellings are orchestrator shorthand for the same bare `export` subcommands; `--mcp` is the `python -m graphify.serve` server.) Suggest and stop.
 - **Migration/schema drift** → out of scope; emit message "schema mutation requires `/kg-schema`" and stop.
 
 ## Quality Gates

@@ -1,0 +1,4 @@
+# Python bytecode created when running the helper tools in kg/schema/tools/
+__pycache__/
+*.pyc
+*.pyo

@@ -6,7 +6,7 @@ A Knowledge Graph + LLM Wiki skill set for [Claude Code](https://claude.ai/claud
 
 Build a **persistent, compounding knowledge base** for any project. The LLM curates a structured wiki, [Graphify](https://github.com/safishamsi/graphify) extracts the structural graph, and you keep both layers in sync with **18 deterministic slash commands** that follow a single 5-formula contract.
 
-Inspired by [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) and extended with a 7-class ontology, proposal-first schema evolution, receipt-based quality gates, and graphify v0.5.0+ MCP integration.
+Inspired by [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) and extended with a 7-class ontology, proposal-first schema evolution, receipt-based quality gates, and graphify v0.8.x integration (tree-sitter structural extraction for 25+ languages incl. **Fortran** for scientific/HPC code — e.g. WRF — reverse-impact `affected`, MCP over stdio — HTTP transport at `0.8.34+`).
 
 ---
 
@@ -37,8 +37,8 @@ Every operation is **deterministic where possible** (BM25 search, graph traversa
 ## Quick Start (5 minutes)
 
 ```bash
-# 1. Install graphify (graph extraction backend)
-pip install graphifyy
+# 1. Install graphify (graph extraction backend) — v0.8.24+ for Fortran (e.g. WRF)
+uv tool install graphifyy          # or: pip install 'graphifyy>=0.8.24'
 
 # 2. Install kg-skill into Claude
 git clone https://github.com/gonos2k/kg-skill.git ~/kg-skill-source
@@ -66,14 +66,17 @@ kg-skill releases track [graphifyy](https://pypi.org/project/graphifyy/) closely
 
 | kg-skill | Minimum `graphifyy` | New behavior gated on this version |
 |---|---|---|
-| **v0.5.7** (current) | **`graphifyy>=0.5.7`** | `.graphify_root` scan-root memo (argument-less `graphify update`); kg-update wiki back-pointer maintenance |
-| v0.5.4 – v0.5.6 | `graphifyy>=0.5.0` | Multi-corpus naming convention, MCP integration via `--mcp` slash form |
+| **v0.8.0** (current) | **`graphifyy>=0.8.24`** (rec. `0.8.39`) | **Fortran type-reference edges** (base Fortran extraction — `.f`/`.F`/`.f90`, `MODULE`/`SUBROUTINE`/`USE`/`CALL` — has shipped since `0.7.2`; best-effort `.F` cpp preprocessing on GNU-cpp hosts); reverse-impact `affected`; `query --context` edge filters; MCP over stdio (HTTP transport needs `>=0.8.34`; `graphify-mcp` console script `>=0.8.36`); `cluster-only --graph <file>` direct (merged-graph re-clustering); import-cycle detection (JS/TS/Python — not Fortran USE); deterministic output (version-namespaced AST cache lands in `>=0.8.38`) |
+| v0.5.7 | `graphifyy>=0.5.7` | `.graphify_root` scan-root memo (argument-less `graphify update`); kg-update wiki back-pointer maintenance |
+| v0.5.4 – v0.5.6 | `graphifyy>=0.5.0` | Multi-corpus naming convention; MCP integration via the orchestrator `--mcp` slash form (the server itself is `python -m graphify.serve`; `--mcp` is not a bare CLI verb) |
 | v0.5.0 – v0.5.3 | `graphifyy>=0.5.0` | Initial 0.5.x line |
 
-Older `graphifyy` versions still work for the kg-skill features that don't depend on the newer CLI behavior — the table above lists the floor required to unlock all features documented for that kg-skill release. To align:
+Older `graphifyy` versions still work for the kg-skill features that don't depend on the newer CLI behavior — the table above lists the floor required to unlock all features documented for that kg-skill release. **Base Fortran extraction works from `graphifyy>=0.7.2`**; this release targets `>=0.8.24` for Fortran type-reference edges (the v0.5.x line has no Fortran support at all). Capital-`F` (`.F`) cpp preprocessing additionally needs a **GNU `cpp`** on PATH (macOS Apple-clang `cpp` does not work — see [`fortran.md`](kg/references/fortran.md)). To align:
 
 ```bash
-pip install --upgrade 'graphifyy>=0.5.7'
+uv tool install graphifyy          # recommended (isolated venv, puts `graphify` on PATH); for the MCP server add the extra: uv tool install "graphifyy[mcp]"
+# or, if you must use pip (discouraged on macOS/Windows — env-mismatch ModuleNotFoundError):
+pip install --upgrade 'graphifyy>=0.8.24'
 ```
 
 ---
@@ -126,7 +129,7 @@ This means the LLM **cannot improvise where authority matters**. Try it: invoke 
 | `/kg-schema` | Evolve the ontology — `propose`, `approve`, `apply`, `migrate`, `diff`, `list`, `pull-global`. Receipt-gated. |
 | `/kg-canvas` | Export wiki as Obsidian Canvas (`.canvas` JSON). Read-only. |
 | `/kg-merge` | **NEW** — Cross-project KG via `graphify merge-graphs` (multiple repos → one merged graph). |
-| `/kg-mcp` | **NEW** — Register `graphify --mcp` in `.mcp.json` so other skills query the graph as MCP tools (no graph.json reload). `--apply` Authority gate. |
+| `/kg-mcp` | **NEW** — Register the graphify MCP server (`python -m graphify.serve`) in `.mcp.json` so other skills query the graph as MCP tools (no graph.json reload). `--apply` Authority gate. |
 
 ### The router
 
@@ -195,14 +198,14 @@ project/
 │   ├── decisions/            #   Decision pages
 │   ├── sources/              #   Source summaries
 │   └── queries/              #   Filed query results
-└── graphify-out/             # Structural graph layer (graphify v0.5.0+)
+└── graphify-out/             # Structural graph layer (graphify v0.8.x)
     ├── graph.json            #   NetworkX node_link_data
-    ├── GRAPH_REPORT.md       #   God nodes, communities, surprises
+    ├── GRAPH_REPORT.md       #   God nodes, communities, surprises, import cycles
     ├── graph.html            #   Interactive HTML (default)
-    ├── manifest.json         #   SHA256 manifest for incremental updates
+    ├── manifest.json         #   SHA256 manifest for incremental updates (portable)
     ├── memory/               #   Q&A feedback loop
     ├── merged-graph.json     #   Cross-repo merge output
-    └── (optional: graph.svg, graph.graphml, cypher.txt)
+    └── (optional: graph.svg, graph.graphml, cypher.txt, <project>-callflow.html, GRAPH_TREE.html)
 ```
 
 ### Verification chain
@@ -222,7 +225,8 @@ project/
 
 | File | Topic |
 |---|---|
-| [`architecture.md`](kg/references/architecture.md) | Layout, source detection, page templates, technical notes |
+| [`architecture.md`](kg/references/architecture.md) | Layout, source detection, page templates, graphify v0.8.x CLI/MCP surface |
+| [`fortran.md`](kg/references/fortran.md) | Fortran corpora (scientific/HPC code, incl. WRF) — `.F`/`.f90` extraction, cpp step, node/edge model, USE/CALL workflow |
 | [`ontology.md`](kg/references/ontology.md) | 7 classes, page_kind, instance_of, schema-as-product, proposal/receipt |
 | [`authority-matrix.md`](kg/references/authority-matrix.md) | Human vs LLM authority, hot.md priority, novelty test |
 | [`context-compression.md`](kg/references/context-compression.md) | BM25 search, hot/overview/_index hierarchy, archive policy |
@@ -248,11 +252,13 @@ project/
 
 ## graphify integration (soft dependency)
 
-11 sub-skills automatically use [graphify](https://github.com/safishamsi/graphify) v0.5.0+ when available, falling back gracefully when absent or stale.
+11 sub-skills automatically use [graphify](https://github.com/safishamsi/graphify) v0.8.x when available, falling back gracefully when absent or stale.
 
 **Freshness gate**: `graphify-out/graph.json` is treated as authoritative only when `mtime < 7 days`. Stale graphs degrade to wiki-only / BM25-only paths and note the staleness in `Caveats:`.
 
-**MCP server tools** (via `graphify <path> --mcp`):
+**Fortran** (scientific/HPC code — numerical libraries, solvers, legacy, earth-system models incl. WRF): graphify extracts Fortran (`.f .F .f90 .F90 …`; base extraction since `0.7.2`, type-reference edges from `0.8.24`; **`.inc` is NOT Fortran** — it routes to the Pascal extractor) into a `MODULE`/`SUBROUTINE`/`USE`/`CALL` graph via local tree-sitter AST (`graphify update` builds it with no LLM calls; community naming and semantic extraction are separate LLM steps). Capital-`F` `cpp` preprocessing is best-effort and needs a GNU `cpp` (no-ops on macOS Apple-clang — `.F` is then parsed raw). See [`kg/references/fortran.md`](kg/references/fortran.md) and the `/kg-query` Impact mode (`graphify affected "X"`).
+
+**MCP server tools** (via `python -m graphify.serve <graph.json>`, or `graphify-mcp`; stdio or `--transport http`):
 
 | Tool | Used by |
 |---|---|
@@ -272,7 +278,8 @@ Register MCP server with `/kg-mcp register --scope project --apply`.
 ### Requirements
 
 - Python ≥ 3.10
-- [graphify](https://github.com/safishamsi/graphify) v0.5.0+: `pip install graphifyy`
+- [graphify](https://github.com/safishamsi/graphify) v0.8.24+ (rec. `0.8.39`): `uv tool install graphifyy` (preferred) or `pip install 'graphifyy>=0.8.24'`
+- A **GNU** `cpp` on PATH (only for Fortran capital-`F` `.F` preprocessing — graphify calls the bare name `cpp`, and macOS Apple-clang `cpp` does NOT work for its invocation, so `.F` is parsed raw). `brew install gcc` alone is **not** enough (it only ships a versioned `cpp-N`, e.g. `cpp-15`); make a binary *named* `cpp` resolve to GNU cpp ahead of `/usr/bin`: `mkdir -p ~/.local/bin && ln -sf "$(ls -1 "$(brew --prefix gcc)"/bin/cpp-* | sort -V | tail -1)" ~/.local/bin/cpp` with `~/.local/bin` early on PATH, then check `python -c "import shutil;print(shutil.which('cpp'))"`
 - [Obsidian](https://obsidian.md/) (optional, for browsing wiki with graph view)
 
 ### Install skills

@@ -63,7 +63,8 @@ For deeper detail, read the relevant reference file:
 
 | Topic | File |
 |---|---|
-| System layout, source detection, page templates, technical notes, graphify v0.5.0 freshness gate | `references/architecture.md` |
+| System layout, source detection, page templates, technical notes, graphify v0.8.x CLI/MCP surface, freshness gate | `references/architecture.md` |
+| Fortran corpora (scientific/HPC code — libraries, solvers, legacy, earth-system incl. WRF) — `.F`/`.f90` extraction, cpp step, node/edge model, USE/CALL graph workflow | `references/fortran.md` |
 | 7 classes, page_kind, instance_of, schema-as-product, proposal/receipt | `references/ontology.md` |
 | Human vs LLM authority, hot.md priority, novelty test, usage rules | `references/authority-matrix.md` |
 | BM25 search, hot/overview/_index hierarchy, archive policy | `references/context-compression.md` |
